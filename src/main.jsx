@@ -8,14 +8,17 @@ import {
   Navigate,
 } from "react-router-dom";
 import "./index.css";
+import { LanguageProvider } from "./utils/LanguageContext";
 import Login from "./pages/auth/login";
-import App from "./App.jsx";
 import Header from "./pages/common/header";
 import Footer from "./pages/common/footer";
 import Home from "./pages/home";
-// import DashboardAdminLayout from "./pages/dashboard_admin";
-// import CategoryPage from "./pages/home/category";
-// import SubCategoryPage from "./pages/home/sub_category";
+import AdminLayout from "./pages/admin/layout/AdminLayout";
+import AdminDashboard from "./pages/admin/dashboard/index";
+import AdminAccounts from "./pages/admin/accounts/index";
+import AdminBranches from "./pages/admin/branches/index";
+import AdminBookings from "./pages/admin/bookings/index";
+import AdminSettings from "./pages/admin/settings/index";
 
 function MainLayout() {
   const location = useLocation();
@@ -72,14 +75,6 @@ const router = createBrowserRouter([
       //   path: ":categorySlug/:subCategorySlug/:productSlug",
       //   element: <ProductDetail />,
       // },
-      // {
-      //   path: "dashboard-admin/*",
-      //   element: (
-      //     <RequireAuth>
-      //       <DashboardAdminLayout />
-      //     </RequireAuth>
-      //   ),
-      // },
       {
         path: "*",
         element: (
@@ -94,12 +89,34 @@ const router = createBrowserRouter([
       },
     ],
   },
+  {
+    path: "/admin",
+    element: <AdminLayout><AdminDashboard /></AdminLayout>,
+  },
+  {
+    path: "/admin/accounts",
+    element: <AdminLayout><AdminAccounts /></AdminLayout>,
+  },
+  {
+    path: "/admin/branches",
+    element: <AdminLayout><AdminBranches /></AdminLayout>,
+  },
+  {
+    path: "/admin/bookings",
+    element: <AdminLayout><AdminBookings /></AdminLayout>,
+  },
+  {
+    path: "/admin/settings",
+    element: <AdminLayout><AdminSettings /></AdminLayout>,
+  },
 ]);
 
 function Main() {
   return (
     <React.StrictMode>
-      <RouterProvider router={router} />
+      <LanguageProvider>
+        <RouterProvider router={router} />
+      </LanguageProvider>
     </React.StrictMode>
   );
 }
