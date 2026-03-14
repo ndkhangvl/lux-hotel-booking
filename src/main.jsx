@@ -19,6 +19,7 @@ import AdminAccounts from "./pages/admin/accounts/index";
 import AdminBranches from "./pages/admin/branches/index";
 import AdminBookings from "./pages/admin/bookings/index";
 import AdminSettings from "./pages/admin/settings/index";
+import AdminBranchRooms from "./pages/admin/branches/rooms/index";
 
 function MainLayout() {
   const location = useLocation();
@@ -100,6 +101,10 @@ const router = createBrowserRouter([
   {
     path: "/admin/branches",
     element: <AdminLayout><AdminBranches /></AdminLayout>,
+  },
+  {
+    path: "/admin/branches/:branchId",
+    element: <AdminLayout><AdminBranchRooms /></AdminLayout>,
   },
   {
     path: "/admin/bookings",

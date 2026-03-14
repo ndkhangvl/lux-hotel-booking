@@ -27,7 +27,15 @@
     "from": "From",
     "to": "To",
     "date": "Date",
-    "language": "Language"
+    "language": "Language",
+    "page": "Page",
+    "of": "of",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "rowsPerPage": "Rows per page",
+    "showing": "Showing",
+    "entries": "branches",
+    "refresh": "Refresh"
   },
   "admin": {
     "sidebar": {
@@ -125,7 +133,29 @@
       "totalRoomsAll": "Total Rooms",
       "searchPlaceholder": "Search by name, address...",
       "amenities": "Amenities",
-      "description": "Description"
+      "description": "Description",
+      "createdAt": "Created At",
+      "addBranch": "Add New Branch",
+      "dialogInsertTitle": "Add New Branch",
+      "dialogUpdateTitle": "Update Branch",
+      "rooms": {
+        "title": "Room Management",
+        "subtitle": "Rooms list for this branch",
+        "backToBranches": "Back to branches",
+        "addRoom": "Add New Room",
+        "roomNumber": "Room Number",
+        "roomType": "Room Type",
+        "floor": "Floor",
+        "price": "Room Price",
+        "totalRooms": "Total Rooms",
+        "availableRooms": "Available",
+        "occupiedRooms": "Occupied",
+        "deleteRoom": "Delete Room",
+        "deleteConfirm": "Are you sure you want to delete this room?",
+        "dialogInsertTitle": "Add New Room",
+        "dialogUpdateTitle": "Update Room",
+        "searchPlaceholder": "Search by room number, type..."
+      }
     },
     "bookings": {
       "title": "Booking Management",

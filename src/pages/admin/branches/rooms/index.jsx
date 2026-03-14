@@ -1,8 +1,7 @@
-﻿import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   Search,
-  GitBranch,
   BedDouble,
   CheckCircle2,
   ChevronLeft,
@@ -10,19 +9,19 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
-  MapPin,
-  Phone,
-  Hash,
+  ArrowLeft,
   Plus,
   Pencil,
-  X,
   Trash2,
+  X,
+  Hash,
+  Layers,
 } from "lucide-react";
 import { useLanguage } from "@/utils/LanguageContext";
 import { cn } from "@/lib/utils";
 import API_BASE from "@/utils/api";
 
-// â”€â”€â”€ Stat Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Stat Card ───────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, icon: Icon, bg, iconColor, loading }) => (
   <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
     <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0", bg)}>
@@ -39,11 +38,10 @@ const StatCard = ({ label, value, icon: Icon, bg, iconColor, loading }) => (
   </div>
 );
 
-// â”€â”€â”€ Pagination â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Pagination ───────────────────────────────────────────────────────────────
 const Pagination = ({ page, totalPages, total, pageSize, onPageChange, onPageSizeChange, loading, t }) => {
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
-
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
       <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -52,18 +50,17 @@ const Pagination = ({ page, totalPages, total, pageSize, onPageChange, onPageSiz
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
           disabled={loading}
-          className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+          className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-300"
         >
           {[5, 10, 20, 50].map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
       </div>
-
       <div className="flex items-center gap-4 text-sm text-gray-500">
         <span>
           {t("common.showing")} <span className="font-semibold text-gray-800">{from}–{to}</span>{" "}
-          {t("common.of")} <span className="font-semibold text-gray-800">{total}</span> {t("common.entries")}
+          {t("common.of")} <span className="font-semibold text-gray-800">{total}</span>
         </span>
         <div className="flex items-center gap-1">
           <button
@@ -82,7 +79,7 @@ const Pagination = ({ page, totalPages, total, pageSize, onPageChange, onPageSiz
             }, [])
             .map((p, i) =>
               p === "..." ? (
-                <span key={`e-${i}`} className="px-1 text-gray-400">â€¦</span>
+                <span key={`e-${i}`} className="px-1 text-gray-400">…</span>
               ) : (
                 <button
                   key={p}
@@ -91,7 +88,7 @@ const Pagination = ({ page, totalPages, total, pageSize, onPageChange, onPageSiz
                   className={cn(
                     "w-8 h-8 rounded-lg text-sm font-medium transition-colors",
                     p === page
-                      ? "bg-emerald-500 text-white"
+                      ? "bg-violet-500 text-white"
                       : "border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
                   )}
                 >
@@ -112,13 +109,12 @@ const Pagination = ({ page, totalPages, total, pageSize, onPageChange, onPageSiz
   );
 };
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// --- Branch Dialog -----------------------------------------------------------
-const EMPTY_BRANCH_FORM = { name: "", address: "", phone: "", del_flg: 0 };
+// ─── Room Dialog ──────────────────────────────────────────────────────────────
+const EMPTY_FORM = { room_number: "", room_type: "", floor: "", price: "", del_flg: 0 };
 
-const BranchDialog = ({ open, mode, initialData, onClose, onSuccess }) => {
+const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) => {
   const { t } = useLanguage();
-  const [form, setForm] = useState(EMPTY_BRANCH_FORM);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -127,12 +123,13 @@ const BranchDialog = ({ open, mode, initialData, onClose, onSuccess }) => {
       setForm(
         mode === "update" && initialData
           ? {
-              name: initialData.name,
-              address: initialData.address,
-              phone: initialData.phone ?? "",
+              room_number: initialData.room_number ?? "",
+              room_type: initialData.room_type ?? "",
+              floor: String(initialData.floor ?? ""),
+              price: String(initialData.price ?? ""),
               del_flg: initialData.del_flg,
             }
-          : EMPTY_BRANCH_FORM
+          : EMPTY_FORM
       );
       setError(null);
     }
@@ -148,11 +145,18 @@ const BranchDialog = ({ open, mode, initialData, onClose, onSuccess }) => {
     setSubmitting(true);
     setError(null);
     try {
-      const body = { ...form, del_flg: Number(form.del_flg) };
-      if (mode === "update" && initialData?.branch_id) {
-        body.branch_id = String(initialData.branch_id);
+      const body = {
+        room_number: form.room_number,
+        room_type: form.room_type || null,
+        floor: form.floor !== "" ? Number(form.floor) : null,
+        price: form.price !== "" ? Number(form.price) : null,
+        del_flg: Number(form.del_flg),
+        branch_id: branchId,
+      };
+      if (mode === "update" && initialData?.room_id) {
+        body.room_id = String(initialData.room_id);
       }
-      const res = await fetch(`${API_BASE}/admin/branches`, {
+      const res = await fetch(`${API_BASE}/admin/branches/${branchId}/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -180,23 +184,23 @@ const BranchDialog = ({ open, mode, initialData, onClose, onSuccess }) => {
         {/* Header */}
         <div className={cn(
           "flex items-center justify-between px-6 py-4 border-b border-gray-100 rounded-t-2xl",
-          isUpdate ? "bg-amber-50" : "bg-emerald-50"
+          isUpdate ? "bg-amber-50" : "bg-violet-50"
         )}>
           <div className="flex items-center gap-3">
             <div className={cn(
               "w-9 h-9 rounded-xl flex items-center justify-center",
-              isUpdate ? "bg-amber-100" : "bg-emerald-100"
+              isUpdate ? "bg-amber-100" : "bg-violet-100"
             )}>
               {isUpdate
                 ? <Pencil size={16} className="text-amber-600" />
-                : <Plus size={16} className="text-emerald-600" />}
+                : <Plus size={16} className="text-violet-600" />}
             </div>
             <div>
               <h3 className="text-base font-bold text-gray-900">
-                {isUpdate ? t("admin.branches.dialogUpdateTitle") : t("admin.branches.dialogInsertTitle")}
+                {isUpdate ? t("admin.branches.rooms.dialogUpdateTitle") : t("admin.branches.rooms.dialogInsertTitle")}
               </h3>
               {isUpdate && initialData && (
-                <p className="text-xs text-gray-400 mt-0.5">{initialData.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{t("admin.branches.rooms.roomNumber")}: {initialData.room_number}</p>
               )}
             </div>
           </div>
@@ -211,49 +215,61 @@ const BranchDialog = ({ open, mode, initialData, onClose, onSuccess }) => {
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
-            {/* Name */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {t("admin.branches.rooms.roomNumber")} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="room_number"
+                  value={form.room_number}
+                  onChange={handleChange}
+                  required
+                  placeholder="101"
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {t("admin.branches.rooms.floor")}
+                </label>
+                <input
+                  name="floor"
+                  type="number"
+                  value={form.floor}
+                  onChange={handleChange}
+                  placeholder="1"
+                  min={1}
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
+                />
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t("admin.branches.branchName")} <span className="text-red-500">*</span>
+                {t("admin.branches.rooms.roomType")}
               </label>
               <input
-                name="name"
-                value={form.name}
+                name="room_type"
+                value={form.room_type}
                 onChange={handleChange}
-                required
-                placeholder={t("admin.branches.branchName")}
-                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 transition"
+                placeholder={t("admin.branches.rooms.roomType")}
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
               />
             </div>
-            {/* Address */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t("admin.branches.address")} <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                name="address"
-                value={form.address}
-                onChange={handleChange}
-                required
-                rows={2}
-                placeholder={t("admin.branches.address")}
-                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 transition resize-none"
-              />
-            </div>
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t("admin.branches.phone")}
+                {t("admin.branches.rooms.price")}
               </label>
               <input
-                name="phone"
-                value={form.phone}
+                name="price"
+                type="number"
+                value={form.price}
                 onChange={handleChange}
-                placeholder="0xxx xxx xxx"
-                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 transition"
+                placeholder="500000"
+                min={0}
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
               />
             </div>
-            {/* Status */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t("common.status")}
@@ -269,7 +285,7 @@ const BranchDialog = ({ open, mode, initialData, onClose, onSuccess }) => {
                       "flex items-center gap-2 flex-1 px-4 py-2.5 rounded-xl border cursor-pointer text-sm font-medium transition-all",
                       String(form.del_flg) === opt.value
                         ? opt.value === "0"
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          ? "border-violet-300 bg-violet-50 text-violet-700"
                           : "border-gray-300 bg-gray-50 text-gray-600"
                         : "border-gray-200 text-gray-400 hover:border-gray-300"
                     )}
@@ -282,20 +298,18 @@ const BranchDialog = ({ open, mode, initialData, onClose, onSuccess }) => {
                       onChange={handleChange}
                       className="sr-only"
                     />
-                    <span className={cn("w-2 h-2 rounded-full", opt.value === "0" ? "bg-emerald-500" : "bg-gray-400")} />
+                    <span className={cn("w-2 h-2 rounded-full", opt.value === "0" ? "bg-violet-500" : "bg-gray-400")} />
                     {opt.label}
                   </label>
                 ))}
               </div>
             </div>
-            {/* Error */}
             {error && (
               <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
                 <AlertCircle size={15} /> {error}
               </div>
             )}
           </div>
-          {/* Footer */}
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
             <button
               type="button"
@@ -310,7 +324,7 @@ const BranchDialog = ({ open, mode, initialData, onClose, onSuccess }) => {
               disabled={submitting}
               className={cn(
                 "flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-60 transition-colors",
-                isUpdate ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-500 hover:bg-emerald-600"
+                isUpdate ? "bg-amber-500 hover:bg-amber-600" : "bg-violet-500 hover:bg-violet-600"
               )}
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
@@ -323,16 +337,19 @@ const BranchDialog = ({ open, mode, initialData, onClose, onSuccess }) => {
   );
 };
 
-// --- Main Component -----------------------------------------------------------
-const AdminBranches = () => {
-  const { t } = useLanguage();
+// ─── Main Component ───────────────────────────────────────────────────────────
+const AdminBranchRooms = () => {
+  const { branchId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const branch = location.state?.branch ?? null;
 
-  const [stats, setStats] = useState({ total_branches: 0, active_branches: 0, total_rooms: 0 });
+  const [stats, setStats] = useState({ total_rooms: 0, available_rooms: 0, occupied_rooms: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
 
-  const [branches, setBranches] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
@@ -345,11 +362,15 @@ const AdminBranches = () => {
   const [dialogMode, setDialogMode] = useState("insert");
   const [dialogData, setDialogData] = useState(null);
 
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
     setStatsError(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/branches/initialize`);
+      const res = await fetch(`${API_BASE}/admin/branches/${branchId}/rooms/initialize`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setStats(data);
@@ -358,30 +379,30 @@ const AdminBranches = () => {
     } finally {
       setStatsLoading(false);
     }
-  }, []);
+  }, [branchId]);
 
-  const fetchBranches = useCallback(async (currentPage, currentPageSize) => {
+  const fetchRooms = useCallback(async (currentPage, currentPageSize) => {
     setTableLoading(true);
     setTableError(null);
     try {
       const res = await fetch(
-        `${API_BASE}/admin/branches/branches-list?page=${currentPage}&page_size=${currentPageSize}`
+        `${API_BASE}/admin/branches/${branchId}/rooms/rooms-list?page=${currentPage}&page_size=${currentPageSize}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setBranches(data.items);
+      setRooms(data.items);
       setTotal(data.total);
       setTotalPages(data.total_pages);
     } catch (err) {
       setTableError(err.message);
-      setBranches([]);
+      setRooms([]);
     } finally {
       setTableLoading(false);
     }
-  }, []);
+  }, [branchId]);
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
-  useEffect(() => { fetchBranches(page, pageSize); }, [fetchBranches, page, pageSize]);
+  useEffect(() => { fetchRooms(page, pageSize); }, [fetchRooms, page, pageSize]);
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) setPage(newPage);
@@ -392,31 +413,15 @@ const AdminBranches = () => {
     setPage(1);
   };
 
-  const handleOpenInsert = () => {
-    setDialogMode("insert");
-    setDialogData(null);
-    setDialogOpen(true);
-  };
-
-  const handleOpenUpdate = (branch) => {
-    setDialogMode("update");
-    setDialogData(branch);
-    setDialogOpen(true);
-  };
-
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState(null);
-
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     setDeleteLoading(true);
     setDeleteError(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/branches`, {
+      const res = await fetch(`${API_BASE}/admin/branches/${branchId}/rooms`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ branch_id: String(deleteTarget.branch_id) }),
+        body: JSON.stringify({ room_id: String(deleteTarget.room_id) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -424,7 +429,7 @@ const AdminBranches = () => {
       }
       setDeleteTarget(null);
       fetchStats();
-      fetchBranches(page, pageSize);
+      fetchRooms(page, pageSize);
     } catch (err) {
       setDeleteError(err.message);
     } finally {
@@ -432,69 +437,76 @@ const AdminBranches = () => {
     }
   };
 
-  const handleDialogSuccess = () => {
-    fetchStats();
-    fetchBranches(page, pageSize);
-  };
-
-  const filtered = branches.filter(
-    (b) =>
-      b.name.toLowerCase().includes(search.toLowerCase()) ||
-      b.address.toLowerCase().includes(search.toLowerCase()) ||
-      (b.phone || "").includes(search)
+  const filtered = rooms.filter(
+    (r) =>
+      (r.room_number ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.room_type ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">{t("admin.branches.title")}</h2>
-          <p className="text-sm text-gray-500 mt-0.5">{t("admin.branches.subtitle")}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { fetchStats(); fetchBranches(page, pageSize); }}
-            disabled={statsLoading || tableLoading}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw size={15} className={cn((statsLoading || tableLoading) && "animate-spin")} />
-            {t("common.refresh")}
-          </button>
-          <button
-            onClick={handleOpenInsert}
-            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold transition-colors"
-          >
-            <Plus size={15} />
-            {t("admin.branches.addBranch")}
-          </button>
+      {/* Breadcrumb / Back */}
+      <div>
+        <button
+          onClick={() => navigate("/admin/branches")}
+          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors mb-3"
+        >
+          <ArrowLeft size={15} />
+          {t("admin.branches.rooms.backToBranches")}
+        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">{t("admin.branches.rooms.title")}</h2>
+            {branch && (
+              <p className="text-sm text-gray-500 mt-0.5">
+                {branch.name}
+                {branch.address && <> &mdash; {branch.address}</>}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { fetchStats(); fetchRooms(page, pageSize); }}
+              disabled={statsLoading || tableLoading}
+              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw size={15} className={cn((statsLoading || tableLoading) && "animate-spin")} />
+              {t("common.refresh")}
+            </button>
+            <button
+              onClick={() => { setDialogMode("insert"); setDialogData(null); setDialogOpen(true); }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-violet-500 hover:bg-violet-600 text-white rounded-xl text-sm font-semibold transition-colors"
+            >
+              <Plus size={15} />
+              {t("admin.branches.rooms.addRoom")}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label={t("admin.branches.totalBranches")} value={stats.total_branches} icon={GitBranch} bg="bg-violet-50" iconColor="text-violet-600" loading={statsLoading} />
-        <StatCard label={t("admin.branches.activeBranches")} value={stats.active_branches} icon={CheckCircle2} bg="bg-emerald-50" iconColor="text-emerald-600" loading={statsLoading} />
-        <StatCard label={t("admin.branches.totalRoomsAll")} value={stats.total_rooms} icon={BedDouble} bg="bg-blue-50" iconColor="text-blue-600" loading={statsLoading} />
+        <StatCard label={t("admin.branches.rooms.totalRooms")} value={stats.total_rooms} icon={BedDouble} bg="bg-violet-50" iconColor="text-violet-600" loading={statsLoading} />
+        <StatCard label={t("admin.branches.rooms.availableRooms")} value={stats.available_rooms} icon={CheckCircle2} bg="bg-emerald-50" iconColor="text-emerald-600" loading={statsLoading} />
+        <StatCard label={t("admin.branches.rooms.occupiedRooms")} value={stats.occupied_rooms} icon={Layers} bg="bg-orange-50" iconColor="text-orange-500" loading={statsLoading} />
       </div>
 
       {statsError && (
         <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
-          <AlertCircle size={16} /> Lá»—i táº£i thá»‘ng kÃª: {statsError}
+          <AlertCircle size={16} /> {statsError}
         </div>
       )}
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {/* Search */}
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="relative max-w-xs">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("admin.branches.searchPlaceholder")}
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 transition"
+              placeholder={t("admin.branches.rooms.searchPlaceholder")}
+              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
             />
           </div>
         </div>
@@ -507,19 +519,15 @@ const AdminBranches = () => {
                   <div className="flex items-center gap-1"><Hash size={11} /> #</div>
                 </th>
                 {[
-                  [t("admin.branches.branchName"), GitBranch],
-                  [t("admin.branches.address"), MapPin],
-                  [t("admin.branches.phone"), Phone],
-                  [t("admin.branches.totalRooms"), BedDouble],
-                  [t("admin.branches.createdAt"), null],
-                  [t("common.status"), null],
-                  [t("common.action"), null],
-                ].map(([label, Icon]) => (
+                  t("admin.branches.rooms.roomNumber"),
+                  t("admin.branches.rooms.roomType"),
+                  t("admin.branches.rooms.floor"),
+                  t("admin.branches.rooms.price"),
+                  t("common.status"),
+                  t("common.action"),
+                ].map((label) => (
                   <th key={label} className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                    <div className="flex items-center gap-1">
-                      {Icon && <Icon size={11} />}
-                      {label}
-                    </div>
+                    {label}
                   </th>
                 ))}
               </tr>
@@ -527,62 +535,57 @@ const AdminBranches = () => {
             <tbody className="divide-y divide-gray-50">
               {tableLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center">
+                  <td colSpan={7} className="py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-gray-400">
-                      <Loader2 size={24} className="animate-spin text-emerald-500" />
+                      <Loader2 size={24} className="animate-spin text-violet-500" />
                       <span className="text-sm">{t("common.loading")}</span>
                     </div>
                   </td>
                 </tr>
               ) : tableError ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center">
+                  <td colSpan={7} className="py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-red-400">
                       <AlertCircle size={24} />
-                      <span className="text-sm">Lá»—i: {tableError}</span>
+                      <span className="text-sm">{tableError}</span>
                     </div>
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
+                  <td colSpan={7} className="py-16 text-center text-sm text-gray-400">
                     {t("common.noData")}
                   </td>
                 </tr>
               ) : (
-                filtered.map((b, idx) => {
+                filtered.map((r, idx) => {
                   const rowNum = (page - 1) * pageSize + idx + 1;
-                  const isActive = b.del_flg === 0;
+                  const isActive = r.del_flg === 0;
                   return (
-                    <tr
-                      key={String(b.branch_id)}
-                      className="hover:bg-gray-50/60 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/admin/branches/${b.branch_id}`, { state: { branch: b } })}
-                    >
+                    <tr key={String(r.room_id)} className="hover:bg-gray-50/60 transition-colors">
                       <td className="px-6 py-4 text-sm text-gray-400 font-mono">{rowNum}</td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-400 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                            {b.name.charAt(0)}
+                            {String(r.room_number ?? "?").slice(0, 2)}
                           </div>
-                          <span className="text-sm font-semibold text-gray-800 whitespace-nowrap">{b.name}</span>
+                          <span className="text-sm font-semibold text-gray-800">{r.room_number}</span>
                         </div>
                       </td>
+                      <td className="px-4 py-4 text-sm text-gray-600">
+                        {r.room_type ?? <span className="text-gray-300">—</span>}
+                      </td>
                       <td className="px-4 py-4">
-                        <span className="text-sm text-gray-600 max-w-[260px] truncate block" title={b.address}>
-                          {b.address}
-                        </span>
+                        {r.floor != null ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-50 border border-gray-100 text-xs font-medium text-gray-600">
+                            <Layers size={10} /> {r.floor}
+                          </span>
+                        ) : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                        {b.phone ?? <span className="text-gray-300">â€”</span>}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
-                          <BedDouble size={11} /> {b.total_rooms}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-500 whitespace-nowrap">
-                        {b.created_date ?? <span className="text-gray-300">â€”</span>}
+                        {r.price != null
+                          ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(r.price)
+                          : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-4">
                         <span className={cn(
@@ -596,14 +599,14 @@ const AdminBranches = () => {
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleOpenUpdate(b); }}
+                            onClick={() => { setDialogMode("update"); setDialogData(r); setDialogOpen(true); }}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors whitespace-nowrap"
                           >
                             <Pencil size={12} />
                             {t("common.edit")}
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); setDeleteError(null); setDeleteTarget(b); }}
+                            onClick={() => { setDeleteError(null); setDeleteTarget(r); }}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors whitespace-nowrap"
                           >
                             <Trash2 size={12} />
@@ -619,7 +622,6 @@ const AdminBranches = () => {
           </table>
         </div>
 
-        {/* Pagination */}
         {!tableLoading && !tableError && total > 0 && (
           <Pagination
             page={page}
@@ -634,15 +636,16 @@ const AdminBranches = () => {
         )}
       </div>
 
-      <BranchDialog
+      <RoomDialog
         open={dialogOpen}
         mode={dialogMode}
         initialData={dialogData}
+        branchId={branchId}
         onClose={() => setDialogOpen(false)}
-        onSuccess={handleDialogSuccess}
+        onSuccess={() => { fetchStats(); fetchRooms(page, pageSize); }}
       />
 
-      {/* Delete confirm dialog */}
+      {/* Delete confirm */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !deleteLoading && setDeleteTarget(null)} />
@@ -652,9 +655,11 @@ const AdminBranches = () => {
                 <Trash2 size={20} className="text-red-600" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-900">{t("admin.branches.deleteBranch")}</h3>
-                <p className="text-sm text-gray-500 mt-1">{t("admin.branches.deleteConfirm")}</p>
-                <p className="text-sm font-semibold text-gray-800 mt-2 truncate">{deleteTarget.name}</p>
+                <h3 className="text-base font-bold text-gray-900">{t("admin.branches.rooms.deleteRoom")}</h3>
+                <p className="text-sm text-gray-500 mt-1">{t("admin.branches.rooms.deleteConfirm")}</p>
+                <p className="text-sm font-semibold text-gray-800 mt-2">
+                  {t("admin.branches.rooms.roomNumber")}: {deleteTarget.room_number}
+                </p>
               </div>
             </div>
             {deleteError && (
@@ -686,4 +691,4 @@ const AdminBranches = () => {
   );
 };
 
-export default AdminBranches;
+export default AdminBranchRooms;
