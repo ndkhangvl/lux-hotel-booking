@@ -113,7 +113,6 @@
     "branches": {
       "title": "Quản Lý Chi Nhánh",
       "subtitle": "Quản lý các chi nhánh khách sạn",
-      "addBranch": "Thêm Chi Nhánh",
       "editBranch": "Chỉnh Sửa Chi Nhánh",
       "deleteBranch": "Xóa Chi Nhánh",
       "deleteConfirm": "Bạn có chắc muốn xóa chi nhánh này?",
@@ -230,5 +229,224 @@
       "saving": "Đang lưu...",
       "saved": "Đã Lưu!"
     }
+  },
+  "nav": {
+    "home": "Trang Chủ",
+    "rooms": "Phòng",
+    "services": "Dịch Vụ",
+    "blog": "Blog",
+    "contact": "Liên Hệ",
+    "bookNow": "Đặt Phòng Ngay"
+  },
+  "home": {
+    "hero": {
+      "title": "Nghỉ dưỡng dưới ánh Cực Quang",
+      "subtitle": "Phòng sang trọng • Dịch vụ chuẩn 4–5★ • Đặt phòng trong 60 giây",
+      "bookNow": "Đặt phòng ngay",
+      "viewRooms": "Xem phòng"
+    },
+    "featuredRooms": {
+      "title": "Phòng Nổi Bật",
+      "subtitle": "Khám phá những phòng sang trọng được yêu thích nhất tại AuroraHotel",
+      "perNight": "/ đêm",
+      "viewAll": "Xem tất cả phòng",
+      "bookNow": "Đặt ngay",
+      "people": "khách",
+      "available": "Còn trống"
+    },
+    "branches": {
+      "title": "Chi Nhánh Của Chúng Tôi",
+      "subtitle": "AuroraHotel hiện diện tại những thành phố đẹp nhất Việt Nam",
+      "rooms": "phòng",
+      "viewDetail": "Xem chi nhánh",
+      "viewAll": "Xem tất cả chi nhánh"
+    },
+    "services": {
+      "title": "Dịch Vụ Cao Cấp",
+      "subtitle": "Trải nghiệm dịch vụ 5 sao tại mọi chi nhánh AuroraHotel",
+      "viewAll": "Khám phá dịch vụ",
+      "items": {
+        "spa": { "name": "Spa & Wellness", "desc": "Thư giãn toàn diện với liệu pháp trị liệu cao cấp" },
+        "restaurant": { "name": "Nhà Hàng Fine Dining", "desc": "Ẩm thực đỉnh cao từ đầu bếp 5 sao tại nhà hàng sang trọng" },
+        "pool": { "name": "Hồ Bơi Vô Cực", "desc": "Hồ bơi ngoài trời với tầm nhìn toàn cảnh thành phố" },
+        "gym": { "name": "Phòng Gym & Fitness", "desc": "Trang thiết bị hiện đại phục vụ nhu cầu luyện tập 24/7" },
+        "airport": { "name": "Đưa Đón Sân Bay", "desc": "Dịch vụ xe sang đưa đón tận nơi, đúng giờ, tiện lợi" },
+        "concierge": { "name": "Concierge 24/7", "desc": "Đội ngũ hỗ trợ tận tâm sẵn sàng phục vụ mọi yêu cầu" }
+      }
+    },
+    "inspiration": {
+      "title": "Cảm Hứng Du Lịch",
+      "subtitle": "Khám phá những câu chuyện và trải nghiệm đáng nhớ từ AuroraHotel",
+      "readMore": "Đọc thêm",
+      "viewAll": "Xem tất cả bài viết",
+      "minRead": "phút đọc"
+    }
+  },
+  "rooms": {
+    "title": "Danh Sách Phòng",
+    "subtitle": "Tìm phòng phù hợp với nhu cầu và ngân sách của bạn",
+    "filterTitle": "Lọc Phòng",
+    "allBranches": "Tất cả chi nhánh",
+    "allTypes": "Tất cả loại phòng",
+    "allStatuses": "Tất cả trạng thái",
+    "priceRange": "Khoảng giá",
+    "reset": "Đặt lại",
+    "found": "Tìm thấy",
+    "roomsCount": "phòng",
+    "perNight": "/ đêm",
+    "people": "khách",
+    "bookNow": "Đặt ngay",
+    "details": "Chi tiết",
+    "noRooms": "Không tìm thấy phòng phù hợp",
+    "available": "Còn trống",
+    "booked": "Đã đặt",
+    "inUse": "Đang sử dụng",
+    "amenities": "Tiện ích",
+    "searchPlaceholder": "Tìm kiếm phòng..."
+  },
+  "services": {
+    "title": "Dịch Vụ",
+    "subtitle": "Tận hưởng những dịch vụ đẳng cấp 5 sao tại AuroraHotel",
+    "learnMore": "Tìm hiểu thêm",
+    "highlight": "Điểm nổi bật",
+    "items": {
+      "spa": {
+        "name": "Spa & Wellness",
+        "desc": "Trung tâm spa đẳng cấp với hơn 20 liệu pháp trị liệu khác nhau, sử dụng nguyên liệu thiên nhiên cao cấp.",
+        "highlights": ["Massage thư giãn", "Chăm sóc da mặt", "Liệu pháp đá nóng", "Tắm muối biển"]
+      },
+      "restaurant": {
+        "name": "Nhà Hàng Fine Dining",
+        "desc": "Trải nghiệm ẩm thực Á-Âu đỉnh cao từ các đầu bếp 5 sao với nguyên liệu tươi ngon nhập khẩu hàng ngày.",
+        "highlights": ["Buffet sáng miễn phí", "Thực đơn theo mùa", "Rượu vang nhập khẩu", "Phòng ăn riêng tư"]
+      },
+      "pool": {
+        "name": "Hồ Bơi Vô Cực",
+        "desc": "Hồ bơi ngoài trời vô cực với tầm nhìn 360° ấn tượng, khu vực jacuzzi và bar pool thoải mái.",
+        "highlights": ["Hồ bơi vô cực", "Jacuzzi outdoor", "Pool bar", "Khu nắng tắm"]
+      },
+      "gym": {
+        "name": "Gym & Fitness Center",
+        "desc": "Phòng gym hiện đại trang bị máy tập cao cấp, lớp yoga và pilates với huấn luyện viên chuyên nghiệp.",
+        "highlights": ["Thiết bị hiện đại", "Huấn luyện viên PT", "Lớp yoga & pilates", "Mở cửa 24/7"]
+      },
+      "airport": {
+        "name": "Đưa Đón Sân Bay",
+        "desc": "Dịch vụ xe sang đưa đón tận nơi với đội ngũ lái xe chuyên nghiệp, lịch sự và đúng giờ.",
+        "highlights": ["Xe sang Mercedes/BMW", "24/7 sẵn sàng", "Theo dõi chuyến bay", "Wifi trên xe"]
+      },
+      "events": {
+        "name": "Tổ Chức Sự Kiện",
+        "desc": "Không gian hội nghị và tiệc cưới hiện đại với sức chứa lên đến 500 người, trang thiết bị AV chuyên nghiệp.",
+        "highlights": ["Sức chứa 500 người", "Trang bị AV hiện đại", "Dịch vụ catering", "Team building"]
+      }
+    }
+  },
+  "blog": {
+    "title": "Blog & Tin Tức",
+    "subtitle": "Khám phá những câu chuyện, trải nghiệm và mẹo du lịch từ AuroraHotel",
+    "readMore": "Đọc thêm",
+    "minRead": "phút đọc",
+    "searchPlaceholder": "Tìm kiếm bài viết...",
+    "noResults": "Không tìm thấy bài viết phù hợp",
+    "categories": {
+      "all": "Tất Cả",
+      "travel": "Du Lịch",
+      "lifestyle": "Lối Sống",
+      "cuisine": "Ẩm Thực",
+      "tips": "Mẹo Du Lịch"
+    }
+  },
+  "contact": {
+    "title": "Liên Hệ",
+    "subtitle": "Chúng tôi luôn sẵn sàng lắng nghe và hỗ trợ bạn 24/7",
+    "form": {
+      "title": "Gửi Tin Nhắn",
+      "name": "Họ và Tên",
+      "namePlaceholder": "Nguyễn Văn A",
+      "email": "Email",
+      "emailPlaceholder": "example@email.com",
+      "phone": "Số Điện Thoại",
+      "phonePlaceholder": "+84 xxx xxx xxx",
+      "subject": "Chủ Đề",
+      "subjectPlaceholder": "Tôi muốn hỏi về...",
+      "message": "Nội Dung Tin Nhắn",
+      "messagePlaceholder": "Nhập nội dung tin nhắn của bạn...",
+      "submit": "Gửi Tin Nhắn",
+      "sending": "Đang gửi...",
+      "success": "Tin nhắn đã được gửi thành công! Chúng tôi sẽ liên hệ lại trong vòng 24 giờ."
+    },
+    "info": {
+      "title": "Thông Tin Liên Hệ",
+      "phone": "Điện Thoại",
+      "email": "Email",
+      "address": "Địa Chỉ",
+      "hours": "Giờ Làm Việc",
+      "hoursValue": "24/7 – Luôn sẵn sàng phục vụ",
+      "phoneValue": "+84 123 456 789",
+      "emailValue": "contact@aurorahotel.vn",
+      "addressValue": "Cần Thơ, Việt Nam"
+    },
+    "faq": {
+      "title": "Câu Hỏi Thường Gặp",
+      "items": [
+        { "q": "Giờ nhận phòng và trả phòng là khi nào?", "a": "Nhận phòng từ 14:00, trả phòng trước 12:00. Early check-in và late check-out theo yêu cầu." },
+        { "q": "Khách sạn có bãi đậu xe không?", "a": "Có, chúng tôi cung cấp bãi đậu xe miễn phí cho khách lưu trú." },
+        { "q": "Có thể hủy đặt phòng không?", "a": "Hủy miễn phí trước 48 giờ. Sau đó thu phí 1 đêm theo chính sách hủy phòng." },
+        { "q": "Khách sạn có phục vụ bữa sáng không?", "a": "Buffet sáng miễn phí phục vụ từ 6:30–10:30 tại nhà hàng tầng 1." }
+      ]
+    }
+  },
+  "booking": {
+    "title": "Đặt Phòng",
+    "subtitle": "Hoàn tất thông tin để đặt phòng tại AuroraHotel",
+    "selectRoom": "Chọn Phòng",
+    "guestInfo": "Thông Tin Khách",
+    "stayInfo": "Thông Tin Lưu Trú",
+    "checkIn": "Ngày Nhận Phòng",
+    "checkOut": "Ngày Trả Phòng",
+    "guests": "Số Khách",
+    "nights": "đêm",
+    "guestName": "Họ và Tên",
+    "guestNamePlaceholder": "Nguyễn Văn A",
+    "guestEmail": "Email",
+    "guestEmailPlaceholder": "example@email.com",
+    "guestPhone": "Số Điện Thoại",
+    "guestPhonePlaceholder": "+84 xxx xxx xxx",
+    "specialRequests": "Yêu Cầu Đặc Biệt",
+    "specialRequestsPlaceholder": "Phòng cao tầng, view đẹp, cũi trẻ em...",
+    "summary": "Tóm Tắt Đặt Phòng",
+    "roomPrice": "Giá phòng",
+    "perNight": "/ đêm",
+    "totalPrice": "Tổng Tiền",
+    "confirm": "Xác Nhận Đặt Phòng",
+    "processing": "Đang xử lý...",
+    "successTitle": "Đặt Phòng Thành Công!",
+    "successDesc": "Chúng tôi đã nhận được yêu cầu đặt phòng của bạn. Email xác nhận sẽ được gửi trong vài phút.",
+    "backHome": "Về Trang Chủ",
+    "noRoom": "Chưa chọn phòng. Vui lòng chọn phòng trước khi đặt.",
+    "browseRooms": "Xem danh sách phòng",
+    "branch": "Chi nhánh",
+    "roomType": "Loại phòng",
+    "roomNumber": "Số phòng"
+  },
+  "footer": {
+    "description": "AuroraHotel – Nơi hành trình nghỉ dưỡng tỏa sáng như cực quang.",
+    "about": {
+      "title": "Giới Thiệu",
+      "intro": "Giới thiệu khách sạn",
+      "rooms": "Phòng & Giá",
+      "blog": "Blog / Tin tức"
+    },
+    "support": {
+      "title": "Hỗ Trợ",
+      "bookingHelp": "Hỗ trợ đặt phòng",
+      "faq": "Câu hỏi thường gặp",
+      "contact": "Liên hệ"
+    },
+    "contact": {
+      "title": "Liên Hệ"
+    },
+    "copyright": "© 2026 AuroraHotel. Copyright by AuroraHotel."
   }
 }

@@ -13,6 +13,11 @@ import Login from "./pages/auth/login";
 import Header from "./pages/common/header";
 import Footer from "./pages/common/footer";
 import Home from "./pages/home";
+import RoomsPage from "./pages/rooms/index";
+import ServicesPage from "./pages/services/index";
+import BlogPage from "./pages/blog/index";
+import ContactPage from "./pages/contact/index";
+import BookingPage from "./pages/booking/index";
 import AdminLayout from "./pages/admin/layout/AdminLayout";
 import AdminDashboard from "./pages/admin/dashboard/index";
 import AdminAccounts from "./pages/admin/accounts/index";
@@ -61,6 +66,26 @@ const router = createBrowserRouter([
       {
         index: true,
         element: <Home />,
+      },
+      {
+        path: "rooms",
+        element: <RoomsPage />,
+      },
+      {
+        path: "services",
+        element: <ServicesPage />,
+      },
+      {
+        path: "blog",
+        element: <BlogPage />,
+      },
+      {
+        path: "contact",
+        element: <ContactPage />,
+      },
+      {
+        path: "booking",
+        element: <BookingPage />,
       },
       {
         path: "login",
