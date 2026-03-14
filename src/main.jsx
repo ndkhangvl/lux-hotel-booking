@@ -20,6 +20,7 @@ import AdminBranches from "./pages/admin/branches/index";
 import AdminBookings from "./pages/admin/bookings/index";
 import AdminSettings from "./pages/admin/settings/index";
 import AdminBranchRooms from "./pages/admin/branches/rooms/index";
+import { RouteErrorBoundary } from "./components/ErrorBoundary";
 
 function MainLayout() {
   const location = useLocation();
@@ -55,6 +56,7 @@ const router = createBrowserRouter([
   {
     path: "/",
     element: <MainLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         index: true,
@@ -64,18 +66,6 @@ const router = createBrowserRouter([
         path: "login",
         element: <Login />,
       },
-      // {
-      //   path: ":categorySlug",
-      //   element: <CategoryPage />,
-      // },
-      // {
-      //   path: ":categorySlug/:subCategorySlug",
-      //   element: <SubCategoryPage />,
-      // },
-      // {
-      //   path: ":categorySlug/:subCategorySlug/:productSlug",
-      //   element: <ProductDetail />,
-      // },
       {
         path: "*",
         element: (
@@ -93,26 +83,32 @@ const router = createBrowserRouter([
   {
     path: "/admin",
     element: <AdminLayout><AdminDashboard /></AdminLayout>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/admin/accounts",
     element: <AdminLayout><AdminAccounts /></AdminLayout>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/admin/branches",
     element: <AdminLayout><AdminBranches /></AdminLayout>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/admin/branches/:branchId",
     element: <AdminLayout><AdminBranchRooms /></AdminLayout>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/admin/bookings",
     element: <AdminLayout><AdminBookings /></AdminLayout>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/admin/settings",
     element: <AdminLayout><AdminSettings /></AdminLayout>,
+    errorElement: <RouteErrorBoundary />,
   },
 ]);
 

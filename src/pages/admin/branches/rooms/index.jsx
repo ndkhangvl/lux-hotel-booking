@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
   Hash,
+  Tag,
   Layers,
 } from "lucide-react";
 import { useLanguage } from "@/utils/LanguageContext";
@@ -109,14 +110,26 @@ const Pagination = ({ page, totalPages, total, pageSize, onPageChange, onPageSiz
   );
 };
 
+// ─── Room Status Config ───────────────────────────────────────────────────────
+const ROOM_STATUS = {
+  0: { labelKey: "admin.branches.rooms.statusAvailable", bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" },
+  1: { labelKey: "admin.branches.rooms.statusBooked",    bg: "bg-blue-100",    text: "text-blue-700",    dot: "bg-blue-500" },
+  2: { labelKey: "admin.branches.rooms.statusInUse",     bg: "bg-amber-100",   text: "text-amber-700",   dot: "bg-amber-500" },
+  3: { labelKey: "admin.branches.rooms.statusUnavailable", bg: "bg-gray-100",  text: "text-gray-500",    dot: "bg-gray-400" },
+};
+
 // ─── Room Dialog ──────────────────────────────────────────────────────────────
-const EMPTY_FORM = { room_number: "", room_type: "", floor: "", price: "", del_flg: 0 };
+const EMPTY_FORM = { room_number: "", room_type_id: "", price: "", del_flg: 0, amenity_ids: [] };
 
 const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) => {
   const { t } = useLanguage();
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [roomTypes, setRoomTypes] = useState([]);
+  const [roomTypesLoading, setRoomTypesLoading] = useState(false);
+  const [amenities, setAmenities] = useState([]);
+  const [amenitiesLoading, setAmenitiesLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -124,20 +137,43 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
         mode === "update" && initialData
           ? {
               room_number: initialData.room_number ?? "",
-              room_type: initialData.room_type ?? "",
-              floor: String(initialData.floor ?? ""),
+              room_type_id: String(initialData.room_type_id ?? ""),
+
               price: String(initialData.price ?? ""),
               del_flg: initialData.del_flg,
+              amenity_ids: (initialData.amenities ?? []).map((a) => String(a.amenity_id)),
             }
           : EMPTY_FORM
       );
       setError(null);
+      // Fetch room types and amenities in parallel
+      setRoomTypesLoading(true);
+      setAmenitiesLoading(true);
+      fetch(`${API_BASE}/admin/rooms/room-types`)
+        .then((r) => r.json())
+        .then((data) => setRoomTypes(Array.isArray(data) ? data : []))
+        .catch(() => setRoomTypes([]))
+        .finally(() => setRoomTypesLoading(false));
+      fetch(`${API_BASE}/admin/rooms/amenities`)
+        .then((r) => r.json())
+        .then((data) => setAmenities(Array.isArray(data) ? data : []))
+        .catch(() => setAmenities([]))
+        .finally(() => setAmenitiesLoading(false));
     }
   }, [open, mode, initialData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleAmenityToggle = (id) => {
+    setForm((prev) => {
+      const ids = prev.amenity_ids.includes(id)
+        ? prev.amenity_ids.filter((x) => x !== id)
+        : [...prev.amenity_ids, id];
+      return { ...prev, amenity_ids: ids };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -147,16 +183,16 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
     try {
       const body = {
         room_number: form.room_number,
-        room_type: form.room_type || null,
-        floor: form.floor !== "" ? Number(form.floor) : null,
+        room_type_id: form.room_type_id || null,
         price: form.price !== "" ? Number(form.price) : null,
         del_flg: Number(form.del_flg),
         branch_id: branchId,
+        amenity_ids: form.amenity_ids,
       };
       if (mode === "update" && initialData?.room_id) {
         body.room_id = String(initialData.room_id);
       }
-      const res = await fetch(`${API_BASE}/admin/branches/${branchId}/rooms`, {
+      const res = await fetch(`${API_BASE}/admin/rooms`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -215,46 +251,37 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  {t("admin.branches.rooms.roomNumber")} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  name="room_number"
-                  value={form.room_number}
-                  onChange={handleChange}
-                  required
-                  placeholder="101"
-                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  {t("admin.branches.rooms.floor")}
-                </label>
-                <input
-                  name="floor"
-                  type="number"
-                  value={form.floor}
-                  onChange={handleChange}
-                  placeholder="1"
-                  min={1}
-                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                {t("admin.branches.rooms.roomNumber")} <span className="text-red-500">*</span>
+              </label>
+              <input
+                name="room_number"
+                value={form.room_number}
+                onChange={handleChange}
+                required
+                placeholder="101"
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t("admin.branches.rooms.roomType")}
               </label>
-              <input
-                name="room_type"
-                value={form.room_type}
+              <select
+                name="room_type_id"
+                value={form.room_type_id}
                 onChange={handleChange}
-                placeholder={t("admin.branches.rooms.roomType")}
-                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
-              />
+                disabled={roomTypesLoading}
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition bg-white disabled:opacity-60"
+              >
+                <option value="">{roomTypesLoading ? t("common.loading") : `-- ${t("admin.branches.rooms.roomType")} --`}</option>
+                {roomTypes.map((rt) => (
+                  <option key={String(rt.room_type_id)} value={String(rt.room_type_id)}>
+                    {rt.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -274,35 +301,68 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t("common.status")}
               </label>
-              <div className="flex gap-3">
-                {[
-                  { value: "0", label: t("common.active") },
-                  { value: "1", label: t("common.inactive") },
-                ].map((opt) => (
-                  <label
-                    key={opt.value}
-                    className={cn(
-                      "flex items-center gap-2 flex-1 px-4 py-2.5 rounded-xl border cursor-pointer text-sm font-medium transition-all",
-                      String(form.del_flg) === opt.value
-                        ? opt.value === "0"
-                          ? "border-violet-300 bg-violet-50 text-violet-700"
-                          : "border-gray-300 bg-gray-50 text-gray-600"
-                        : "border-gray-200 text-gray-400 hover:border-gray-300"
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="del_flg"
-                      value={opt.value}
-                      checked={String(form.del_flg) === opt.value}
-                      onChange={handleChange}
-                      className="sr-only"
-                    />
-                    <span className={cn("w-2 h-2 rounded-full", opt.value === "0" ? "bg-violet-500" : "bg-gray-400")} />
-                    {opt.label}
-                  </label>
-                ))}
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(ROOM_STATUS).map(([val, cfg]) => {
+                  const selected = String(form.del_flg) === val;
+                  return (
+                    <label
+                      key={val}
+                      className={cn(
+                        "flex items-center gap-2 px-3.5 py-2.5 rounded-xl border cursor-pointer text-sm font-medium transition-all",
+                        selected
+                          ? cn(cfg.bg, cfg.text, "border-transparent")
+                          : "border-gray-200 text-gray-400 hover:border-gray-300"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="del_flg"
+                        value={val}
+                        checked={selected}
+                        onChange={handleChange}
+                        className="sr-only"
+                      />
+                      <span className={cn("w-2 h-2 rounded-full flex-shrink-0", selected ? cfg.dot : "bg-gray-300")} />
+                      {t(cfg.labelKey)}
+                    </label>
+                  );
+                })}
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                {t("admin.branches.rooms.amenities")}
+              </label>
+              {amenitiesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
+                  <Loader2 size={14} className="animate-spin" /> {t("common.loading")}
+                </div>
+              ) : amenities.length === 0 ? (
+                <p className="text-sm text-gray-400 py-2">{t("common.noData")}</p>
+              ) : (
+                <div className="flex flex-wrap gap-2 p-3 border border-gray-200 rounded-xl">
+                  {amenities.map((a) => {
+                    const sid = String(a.amenity_id);
+                    const selected = form.amenity_ids.includes(sid);
+                    return (
+                      <button
+                        key={sid}
+                        type="button"
+                        onClick={() => handleAmenityToggle(sid)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all",
+                          selected
+                            ? "bg-violet-100 border-violet-300 text-violet-700"
+                            : "border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                        )}
+                      >
+                        <Tag size={11} />
+                        {a.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             {error && (
               <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
@@ -370,7 +430,7 @@ const AdminBranchRooms = () => {
     setStatsLoading(true);
     setStatsError(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/branches/${branchId}/rooms/initialize`);
+      const res = await fetch(`${API_BASE}/admin/rooms/initialize?branch_id=${branchId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setStats(data);
@@ -386,7 +446,7 @@ const AdminBranchRooms = () => {
     setTableError(null);
     try {
       const res = await fetch(
-        `${API_BASE}/admin/branches/${branchId}/rooms/rooms-list?page=${currentPage}&page_size=${currentPageSize}`
+        `${API_BASE}/admin/rooms/rooms-list?branch_id=${branchId}&page=${currentPage}&page_size=${currentPageSize}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -440,7 +500,7 @@ const AdminBranchRooms = () => {
   const filtered = rooms.filter(
     (r) =>
       (r.room_number ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (r.room_type ?? "").toLowerCase().includes(search.toLowerCase())
+      (r.room_type_name ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -521,7 +581,7 @@ const AdminBranchRooms = () => {
                 {[
                   t("admin.branches.rooms.roomNumber"),
                   t("admin.branches.rooms.roomType"),
-                  t("admin.branches.rooms.floor"),
+                  t("admin.branches.rooms.amenities"),
                   t("admin.branches.rooms.price"),
                   t("common.status"),
                   t("common.action"),
@@ -560,7 +620,7 @@ const AdminBranchRooms = () => {
               ) : (
                 filtered.map((r, idx) => {
                   const rowNum = (page - 1) * pageSize + idx + 1;
-                  const isActive = r.del_flg === 0;
+                  const statusCfg = ROOM_STATUS[r.del_flg] ?? ROOM_STATUS[0];
                   return (
                     <tr key={String(r.room_id)} className="hover:bg-gray-50/60 transition-colors">
                       <td className="px-6 py-4 text-sm text-gray-400 font-mono">{rowNum}</td>
@@ -573,14 +633,26 @@ const AdminBranchRooms = () => {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-600">
-                        {r.room_type ?? <span className="text-gray-300">—</span>}
+                        {r.room_type_name ?? <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-4">
-                        {r.floor != null ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-50 border border-gray-100 text-xs font-medium text-gray-600">
-                            <Layers size={10} /> {r.floor}
-                          </span>
-                        ) : <span className="text-gray-300">—</span>}
+                        {r.amenities && r.amenities.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {r.amenities.slice(0, 3).map((a) => (
+                              <span
+                                key={String(a.amenity_id)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-violet-50 border border-violet-100 text-xs text-violet-600 whitespace-nowrap"
+                              >
+                                <Tag size={9} />{a.name}
+                              </span>
+                            ))}
+                            {r.amenities.length > 3 && (
+                              <span className="text-xs text-gray-400 self-center">+{r.amenities.length - 3}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
                         {r.price != null
@@ -590,10 +662,10 @@ const AdminBranchRooms = () => {
                       <td className="px-4 py-4">
                         <span className={cn(
                           "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
-                          isActive ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                          statusCfg.bg, statusCfg.text
                         )}>
-                          <span className={cn("w-1.5 h-1.5 rounded-full", isActive ? "bg-emerald-500" : "bg-gray-400")} />
-                          {t(isActive ? "common.active" : "common.inactive")}
+                          <span className={cn("w-1.5 h-1.5 rounded-full", statusCfg.dot)} />
+                          {t(statusCfg.labelKey)}
                         </span>
                       </td>
                       <td className="px-4 py-4">

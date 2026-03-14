@@ -154,7 +154,12 @@
         "deleteConfirm": "Bạn có chắc muốn xóa phòng này?",
         "dialogInsertTitle": "Thêm Phòng Mới",
         "dialogUpdateTitle": "Cập Nhật Phòng",
-        "searchPlaceholder": "Tìm theo số phòng, loại phòng..."
+        "searchPlaceholder": "Tìm theo số phòng, loại phòng...",
+        "statusAvailable": "Còn Trống",
+        "statusBooked": "Đã Đặt",
+        "statusInUse": "Đang Sử Dụng",
+        "statusUnavailable": "Không Sử Dụng",
+        "amenities": "Tiện Ích"
       }
     },
     "bookings": {

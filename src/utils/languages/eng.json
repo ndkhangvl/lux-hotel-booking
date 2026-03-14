@@ -154,7 +154,12 @@
         "deleteConfirm": "Are you sure you want to delete this room?",
         "dialogInsertTitle": "Add New Room",
         "dialogUpdateTitle": "Update Room",
-        "searchPlaceholder": "Search by room number, type..."
+        "searchPlaceholder": "Search by room number, type...",
+        "statusAvailable": "Available",
+        "statusBooked": "Booked",
+        "statusInUse": "In Use",
+        "statusUnavailable": "Unavailable",
+        "amenities": "Amenities"
       }
     },
     "bookings": {
