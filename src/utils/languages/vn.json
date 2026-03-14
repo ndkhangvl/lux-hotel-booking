@@ -27,7 +27,15 @@
     "from": "Từ",
     "to": "Đến",
     "date": "Ngày",
-    "language": "Ngôn ngữ"
+    "language": "Ngôn ngữ",
+    "page": "Trang",
+    "of": "trên",
+    "prevPage": "Trước",
+    "nextPage": "Tiếp",
+    "rowsPerPage": "Dòng/trang",
+    "showing": "Hiển thị",
+    "entries": "chi nhánh",
+    "refresh": "Làm mới"
   },
   "admin": {
     "sidebar": {
@@ -125,7 +133,34 @@
       "totalRoomsAll": "Tổng Số Phòng",
       "searchPlaceholder": "Tìm theo tên, địa chỉ...",
       "amenities": "Tiện Nghi",
-      "description": "Mô Tả"
+      "description": "Mô Tả",
+      "createdAt": "Ngày Tạo",
+      "addBranch": "Thêm Chi Nhánh Mới",
+      "dialogInsertTitle": "Thêm Chi Nhánh Mới",
+      "dialogUpdateTitle": "Cập Nhật Chi Nhánh",
+      "rooms": {
+        "title": "Quản Lý Phòng",
+        "subtitle": "Danh sách phòng của chi nhánh",
+        "backToBranches": "Quay lại danh sách chi nhánh",
+        "addRoom": "Thêm Phòng Mới",
+        "roomNumber": "Số Phòng",
+        "roomType": "Loại Phòng",
+        "floor": "Tầng",
+        "price": "Giá Phòng",
+        "totalRooms": "Tổng Phòng",
+        "availableRooms": "Phòng Trống",
+        "occupiedRooms": "Đang Sử Dụng",
+        "deleteRoom": "Xóa Phòng",
+        "deleteConfirm": "Bạn có chắc muốn xóa phòng này?",
+        "dialogInsertTitle": "Thêm Phòng Mới",
+        "dialogUpdateTitle": "Cập Nhật Phòng",
+        "searchPlaceholder": "Tìm theo số phòng, loại phòng...",
+        "statusAvailable": "Còn Trống",
+        "statusBooked": "Đã Đặt",
+        "statusInUse": "Đang Sử Dụng",
+        "statusUnavailable": "Không Sử Dụng",
+        "amenities": "Tiện Ích"
+      }
     },
     "bookings": {
       "title": "Quản Lý Đặt Phòng",
