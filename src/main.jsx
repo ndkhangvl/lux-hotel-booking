@@ -26,6 +26,7 @@ import AdminBookings from "./pages/admin/bookings/index";
 import AdminSettings from "./pages/admin/settings/index";
 import AdminBranchRooms from "./pages/admin/branches/rooms/index";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
+import { ACCESS_TOKEN } from "./utils/constant";
 
 function MainLayout() {
   const location = useLocation();
@@ -45,15 +46,46 @@ function MainLayout() {
   );
 }
 
-function hasAccessToken() {
-  return document.cookie.split("; ").some(cookie => cookie.startsWith("accessToken=") && cookie.split("=")[1]);
+function getAccessToken() {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ACCESS_TOKEN);
 }
 
-function RequireAuth({ children }) {
+function getUserRoleFromToken() {
+  const token = getAccessToken();
+  if (!token) return null;
+
+  try {
+    const payloadBase64 = token.split(".")[1];
+    if (!payloadBase64) return null;
+
+    const payloadJson = atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(payloadJson);
+
+    return (
+      payload.role ||
+      payload.Role ||
+      (Array.isArray(payload.roles) ? payload.roles[0] : null) ||
+      null
+    );
+  } catch (error) {
+    console.error("Invalid access token format:", error);
+    return null;
+  }
+}
+
+function hasAdminAccess() {
+  const role = getUserRoleFromToken();
+  return role === "Admin" || role === "Receptionist";
+}
+
+function RequireAdmin({ children }) {
   const location = useLocation();
-  if (!hasAccessToken()) {
+
+  if (!getAccessToken() || !hasAdminAccess()) {
     return <Navigate to="/" state={{ from: location }} replace />;
   }
+
   return children;
 }
 
@@ -107,33 +139,38 @@ const router = createBrowserRouter([
   },
   {
     path: "/admin",
-    element: <AdminLayout><AdminDashboard /></AdminLayout>,
+    element: (
+      <RequireAdmin>
+        <AdminLayout />
+      </RequireAdmin>
+    ),
     errorElement: <RouteErrorBoundary />,
-  },
-  {
-    path: "/admin/accounts",
-    element: <AdminLayout><AdminAccounts /></AdminLayout>,
-    errorElement: <RouteErrorBoundary />,
-  },
-  {
-    path: "/admin/branches",
-    element: <AdminLayout><AdminBranches /></AdminLayout>,
-    errorElement: <RouteErrorBoundary />,
-  },
-  {
-    path: "/admin/branches/:branchId",
-    element: <AdminLayout><AdminBranchRooms /></AdminLayout>,
-    errorElement: <RouteErrorBoundary />,
-  },
-  {
-    path: "/admin/bookings",
-    element: <AdminLayout><AdminBookings /></AdminLayout>,
-    errorElement: <RouteErrorBoundary />,
-  },
-  {
-    path: "/admin/settings",
-    element: <AdminLayout><AdminSettings /></AdminLayout>,
-    errorElement: <RouteErrorBoundary />,
+    children: [
+      {
+        index: true,
+        element: <AdminDashboard />,
+      },
+      {
+        path: "accounts",
+        element: <AdminAccounts />,
+      },
+      {
+        path: "branches",
+        element: <AdminBranches />,
+      },
+      {
+        path: "branches/:branchId",
+        element: <AdminBranchRooms />,
+      },
+      {
+        path: "bookings",
+        element: <AdminBookings />,
+      },
+      {
+        path: "settings",
+        element: <AdminSettings />,
+      },
+    ],
   },
 ]);
 
