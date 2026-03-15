@@ -1,43 +1,38 @@
 import { useLanguage } from "@/utils/LanguageContext";
+import API_BASE from "@/utils/api";
 import { ArrowRight, BedDouble, MapPin } from "lucide-react";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-const MOCK_BRANCHES = [
-  {
-    id: 1,
-    name: "AuroraHotel Cần Thơ",
-    city: "Cần Thơ",
-    address: "69 Đường 3/2, Ninh Kiều, Cần Thơ",
-    rooms: 48,
-    rating: 4.9,
-    image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80",
-    tag: "Flagship",
-  },
-  {
-    id: 2,
-    name: "AuroraHotel Hồ Chí Minh",
-    city: "Hồ Chí Minh",
-    address: "15 Nguyễn Huệ, Quận 1, TP.HCM",
-    rooms: 72,
-    rating: 4.8,
-    image: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&q=80",
-    tag: "New",
-  },
-  {
-    id: 3,
-    name: "AuroraHotel Đà Lạt",
-    city: "Đà Lạt",
-    address: "28 Trần Phú, Phường 4, Đà Lạt",
-    rooms: 36,
-    rating: 4.9,
-    image: "https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=600&q=80",
-    tag: "Popular",
-  },
+const BRANCH_IMAGES = [
+  "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=600&q=80",
+  "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&q=80",
+  "https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=600&q=80",
 ];
+
+const BRANCH_TAGS = ["Flagship", "New", "Popular"];
 
 const Branches = () => {
   const { t } = useLanguage();
+  const [branches, setBranches] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/user/branches/branches-list?page=1&page_size=3`);
+        if (!res.ok) throw new Error("Failed to fetch branches");
+        const data = await res.json();
+        setBranches(Array.isArray(data?.items) ? data.items.slice(0, 3) : []);
+      } catch {
+        setBranches([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBranches();
+  }, []);
 
   return (
     <section className="py-20 bg-slate-50">
@@ -65,13 +60,22 @@ const Branches = () => {
 
         {/* Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {MOCK_BRANCHES.map((branch) => (
+          {loading &&
+            [0, 1, 2].map((idx) => (
+              <div
+                key={idx}
+                className="relative rounded-2xl overflow-hidden h-80 bg-slate-200 animate-pulse"
+              />
+            ))}
+
+          {!loading &&
+            branches.map((branch, idx) => (
             <div
-              key={branch.id}
+              key={branch.branch_id}
               className="group relative rounded-2xl overflow-hidden h-80 cursor-pointer shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
             >
               <img
-                src={branch.image}
+                src={BRANCH_IMAGES[idx % BRANCH_IMAGES.length]}
                 alt={branch.name}
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
@@ -80,7 +84,7 @@ const Branches = () => {
               {/* Tag */}
               <div className="absolute top-4 left-4">
                 <span className="bg-(--main) text-white text-xs font-bold px-3 py-1 rounded-full">
-                  {branch.tag}
+                  {BRANCH_TAGS[idx % BRANCH_TAGS.length]}
                 </span>
               </div>
 
@@ -94,7 +98,7 @@ const Branches = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
                     <BedDouble className="w-4 h-4 text-(--main)" />
-                    <span className="text-white/80">{branch.rooms} {t("home.branches.rooms")}</span>
+                    <span className="text-white/80">{branch.total_rooms || 0} {t("home.branches.rooms")}</span>
                   </div>
                   <Link
                     to="/rooms"
@@ -106,6 +110,12 @@ const Branches = () => {
               </div>
             </div>
           ))}
+
+          {!loading && branches.length === 0 && (
+            <div className="md:col-span-3 bg-white rounded-2xl border border-gray-100 p-8 text-center text-slate-500">
+              {t("common.noData")}
+            </div>
+          )}
         </div>
       </div>
     </section>
