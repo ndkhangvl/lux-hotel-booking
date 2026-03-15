@@ -448,5 +448,30 @@
       "title": "Liên Hệ"
     },
     "copyright": "© 2026 AuroraHotel. Copyright by AuroraHotel."
+  },
+  "auth": {
+    "loginRegister": "Đăng Nhập/Đăng Ký",
+    "loginTitle": "Đăng Nhập",
+    "loginSubtitle": "Nhập thông tin tài khoản để tiếp tục",
+    "registerTitle": "Đăng Ký",
+    "registerSubtitle": "Điền thông tin để tạo tài khoản mới",
+    "fullName": "Họ và Tên",
+    "fullNamePlaceholder": "Nguyễn Văn A",
+    "username": "Tên đăng nhập",
+    "usernamePlaceholder": "Nhập username",
+    "email": "Email",
+    "emailPlaceholder": "example@email.com",
+    "password": "Mật khẩu",
+    "passwordPlaceholder": "Nhập mật khẩu",
+    "confirmPassword": "Xác nhận mật khẩu",
+    "confirmPasswordPlaceholder": "Nhập lại mật khẩu",
+    "loginButton": "Đăng Nhập",
+    "registerButton": "Đăng Ký",
+    "loginWithGoogle": "Đăng nhập bằng Gmail",
+    "loginWithFacebook": "Đăng nhập bằng Facebook",
+    "noAccount": "Chưa có tài khoản?",
+    "registerHere": "Đăng ký Tại Đây",
+    "hasAccount": "Đã có tài khoản?",
+    "loginHere": "Đăng nhập Tại Đây"
   }
 }
