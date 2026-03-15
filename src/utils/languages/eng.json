@@ -448,5 +448,30 @@
       "title": "Contact"
     },
     "copyright": "© 2026 AuroraHotel. Copyright by AuroraHotel."
+  },
+  "auth": {
+    "loginRegister": "Login/Register",
+    "loginTitle": "Login",
+    "loginSubtitle": "Enter your account information to continue",
+    "registerTitle": "Register",
+    "registerSubtitle": "Fill in your information to create a new account",
+    "fullName": "Full Name",
+    "fullNamePlaceholder": "John Smith",
+    "username": "Username",
+    "usernamePlaceholder": "Enter username",
+    "email": "Email",
+    "emailPlaceholder": "example@email.com",
+    "password": "Password",
+    "passwordPlaceholder": "Enter password",
+    "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Re-enter password",
+    "loginButton": "Login",
+    "registerButton": "Register",
+    "loginWithGoogle": "Login with Gmail",
+    "loginWithFacebook": "Login with Facebook",
+    "noAccount": "Don't have an account?",
+    "registerHere": "Register Here",
+    "hasAccount": "Already have an account?",
+    "loginHere": "Login Here"
   }
 }

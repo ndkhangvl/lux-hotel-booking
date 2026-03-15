@@ -1,6 +1,13 @@
 import { useLanguage } from "@/utils/LanguageContext";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { HotelShareIcon } from "@/utils/share_icon";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, Facebook, Search } from "lucide-react";
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -14,6 +21,8 @@ const NAV_LINKS = [
 
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
   const location = useLocation();
   const { t, lang, switchLang } = useLanguage();
 
@@ -74,6 +83,13 @@ const Header = () => {
             >
               {t("nav.bookNow")} <ArrowRight className="w-4 h-4" />
             </Link>
+            <button
+              type="button"
+              onClick={() => setAuthOpen(true)}
+              className="hidden sm:flex items-center gap-2 border border-gray-200 hover:border-(--main) text-slate-700 hover:text-(--main) px-5 py-2.5 rounded-full font-semibold text-sm transition-all"
+            >
+              {t("auth.loginRegister")}
+            </button>
             {/* Language Switcher */}
             <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-full p-1">
               <button
@@ -133,6 +149,18 @@ const Header = () => {
             {t("nav.bookNow")}
           </Link>
         </div>
+        <div className="flex items-center justify-center pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMobileOpen(false);
+              setAuthOpen(true);
+            }}
+            className="w-full border border-gray-200 hover:border-(--main) text-slate-700 hover:text-(--main) py-3 rounded-xl font-semibold transition-all"
+          >
+            {t("auth.loginRegister")}
+          </button>
+        </div>
         {/* Mobile Language Switcher */}
         <div className="flex items-center justify-center gap-2 pt-2">
           <button
@@ -153,6 +181,172 @@ const Header = () => {
           </button>
         </div>
       </div>
+
+      <Dialog open={authOpen} onOpenChange={setAuthOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl border border-gray-200">
+          <DialogHeader>
+            <DialogTitle>{t("auth.loginTitle")}</DialogTitle>
+            <DialogDescription>{t("auth.loginSubtitle")}</DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                {t("auth.username")}
+              </label>
+              <input
+                type="text"
+                placeholder={t("auth.usernamePlaceholder")}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                {t("auth.password")}
+              </label>
+              <input
+                type="password"
+                placeholder={t("auth.passwordPlaceholder")}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-(--main) hover:bg-[#52DBA9] text-white py-3 rounded-xl font-semibold transition-all"
+            >
+              {t("auth.loginButton")}
+            </button>
+          </form>
+
+          <div className="flex items-center gap-3 text-xs text-gray-400">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span>OR</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              type="button"
+              className="w-full flex items-center justify-center gap-2 border border-[#EA4335]/30 hover:border-[#EA4335] bg-[#EA4335] py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+            >
+              <span className="w-5 h-5 rounded-full bg-white text-[#EA4335] flex items-center justify-center text-xs font-bold">
+                G
+              </span>
+              {t("auth.loginWithGoogle")}
+            </button>
+            <button
+              type="button"
+              className="w-full flex items-center justify-center gap-2 border border-[#1877F2]/30 hover:border-[#1877F2] bg-[#1877F2] py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+            >
+              <Facebook className="w-4 h-4" />
+              {t("auth.loginWithFacebook")}
+            </button>
+          </div>
+
+          <p className="text-center text-sm text-slate-500">
+            {t("auth.noAccount")}{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setAuthOpen(false);
+                setRegisterOpen(true);
+              }}
+              className="text-(--main) font-semibold hover:underline"
+            >
+              {t("auth.registerHere")}
+            </button>
+          </p>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl border border-gray-200">
+          <DialogHeader>
+            <DialogTitle>{t("auth.registerTitle")}</DialogTitle>
+            <DialogDescription>{t("auth.registerSubtitle")}</DialogDescription>
+          </DialogHeader>
+
+          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                {t("auth.fullName")}
+              </label>
+              <input
+                type="text"
+                placeholder={t("auth.fullNamePlaceholder")}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                {t("auth.username")}
+              </label>
+              <input
+                type="text"
+                placeholder={t("auth.usernamePlaceholder")}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                {t("auth.email")}
+              </label>
+              <input
+                type="email"
+                placeholder={t("auth.emailPlaceholder")}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                {t("auth.password")}
+              </label>
+              <input
+                type="password"
+                placeholder={t("auth.passwordPlaceholder")}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                {t("auth.confirmPassword")}
+              </label>
+              <input
+                type="password"
+                placeholder={t("auth.confirmPasswordPlaceholder")}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-(--main) hover:bg-[#52DBA9] text-white py-3 rounded-xl font-semibold transition-all"
+            >
+              {t("auth.registerButton")}
+            </button>
+          </form>
+
+          <p className="text-center text-sm text-slate-500">
+            {t("auth.hasAccount")}{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setRegisterOpen(false);
+                setAuthOpen(true);
+              }}
+              className="text-(--main) font-semibold hover:underline"
+            >
+              {t("auth.loginHere")}
+            </button>
+          </p>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 };
