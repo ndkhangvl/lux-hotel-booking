@@ -51,7 +51,7 @@ const Branches = () => {
             </p>
           </div>
           <Link
-            to="/contact"
+            to="/branches"
             className="flex items-center gap-2 text-(--main) font-semibold text-sm hover:gap-3 transition-all shrink-0"
           >
             {t("home.branches.viewAll")} <ArrowRight className="w-4 h-4" />
@@ -101,7 +101,7 @@ const Branches = () => {
                     <span className="text-white/80">{branch.total_rooms || 0} {t("home.branches.rooms")}</span>
                   </div>
                   <Link
-                    to="/rooms"
+                    to={`/branches/${branch.branch_id}`}
                     className="flex items-center gap-1 text-(--main) text-sm font-semibold hover:text-white transition-colors"
                   >
                     {t("home.branches.viewDetail")} <ArrowRight className="w-3.5 h-3.5" />
