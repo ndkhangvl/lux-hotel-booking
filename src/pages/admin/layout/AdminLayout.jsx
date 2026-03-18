@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -30,6 +30,15 @@ const NAV_ITEMS = [
 
 const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
+
+  // Logout handler: clear session and redirect to home
+  const handleLogout = () => {
+    // Clear localStorage tokens, session, etc
+    localStorage.removeItem("accessToken");
+    // Add other session clears here if needed
+    navigate("/", { replace: true });
+  };
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -114,6 +123,7 @@ const Sidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }) => {
             "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:bg-red-500/20 hover:text-red-300 transition-colors",
             collapsed ? "justify-center" : ""
           )}
+          onClick={handleLogout}
         >
           <LogOut size={18} className="flex-shrink-0" />
           {!collapsed && <span>{t("admin.header.logout")}</span>}
@@ -285,7 +295,7 @@ const AdminHeader = ({ onMobileMenuOpen }) => {
 };
 
 // ─── Admin Layout ───────────────────────────────────────────────────────────
-const AdminLayout = ({ children }) => {
+const AdminLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -300,7 +310,7 @@ const AdminLayout = ({ children }) => {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <AdminHeader onMobileMenuOpen={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {children}
+          <Outlet />
         </main>
       </div>
     </div>

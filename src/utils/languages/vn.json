@@ -35,7 +35,9 @@
     "rowsPerPage": "Dòng/trang",
     "showing": "Hiển thị",
     "entries": "chi nhánh",
-    "refresh": "Làm mới"
+    "refresh": "Làm mới",
+    "createdDate": "Ngày tạo",
+    "createdTime": "Thời gian"
   },
   "admin": {
     "sidebar": {

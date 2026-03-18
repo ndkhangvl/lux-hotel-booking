@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import authApi from "@/api/AuthApi";
+import { ACCESS_TOKEN } from "@/utils/constant";
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -7,6 +9,8 @@ const Login = () => {
     password: "",
     remember: false,
   });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -16,11 +20,45 @@ const Login = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Submit logic here.
-    // Example: console.log(form);
-  };
+    setError("");
+    setLoading(true);
+
+    if (!form.email || !form.password) {
+      setError("Vui lòng nhập đầy đủ email và mật khẩu.");
+      setLoading(false);
+      return;
+    }
+
+  try {
+    const data = await authApi.login({
+      email: form.email, // hoặc username, tùy API backend
+      password: form.password,
+    });
+
+    console.log("login response:", data);
+
+    if (data?.token) {
+      localStorage.setItem(ACCESS_TOKEN, data.token);
+      window.location.href = "/";
+    } else {
+      setError("Đăng nhập thất bại: Không nhận được token");
+    }
+  } catch (err) {
+    console.error("login error:", err);
+
+    if (err?.response?.data?.message) {
+      setError(err.response.data.message);
+    } else if (err?.message) {
+      setError(err.message);
+    } else {
+      setError("Đăng nhập thất bại. Vui lòng kiểm tra thông tin!");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <main className="flex-1 flex items-center justify-center py-12 px-4 bg-gray-50 min-h-screen">
@@ -33,7 +71,10 @@ const Login = () => {
             Đăng nhập để tiếp tục khám phá
           </p>
         </div>
-        <form className="space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-6" onSubmit={handleSubmit} autoComplete="off">
+          {!!error && (
+            <div className="text-red-500 text-sm font-bold text-center">{error}</div>
+          )}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">
               Tên đăng nhập / Email
@@ -47,6 +88,7 @@ const Login = () => {
                 placeholder="Nhập email của bạn"
                 className="w-full h-14 pl-12 pr-6 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                 autoComplete="username"
+                required
               />
               <i className="fa-solid fa-envelope absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
             </div>
@@ -69,6 +111,7 @@ const Login = () => {
                 placeholder="••••••••"
                 className="w-full h-14 pl-12 pr-12 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                 autoComplete="current-password"
+                required
               />
               <i className="fa-solid fa-lock absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
               <button
@@ -100,9 +143,10 @@ const Login = () => {
           </div>
           <button
             type="submit"
-            className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all active:scale-95 shadow-xl shadow-blue-600/20"
+            className={`w-full h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all active:scale-95 shadow-xl shadow-blue-600/20 ${loading ? "opacity-60 cursor-not-allowed" : ""}`}
+            disabled={loading}
           >
-            Đăng Nhập
+            {loading ? "Đang đăng nhập..." : "Đăng Nhập"}
           </button>
         </form>
 
@@ -117,7 +161,7 @@ const Login = () => {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <button className="h-14 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-all font-bold text-sm text-gray-900 shadow-sm">
+          <button className="h-14 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-all font-bold text-sm text-gray-900 shadow-sm" type="button">
             <img
               src="https://www.svgrepo.com/show/475656/google-color.svg"
               className="w-5 h-5"
@@ -125,7 +169,7 @@ const Login = () => {
             />
             Google
           </button>
-          <button className="h-14 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-all font-bold text-sm text-gray-900 shadow-sm">
+          <button className="h-14 bg-white border border-gray-100 rounded-2xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-all font-bold text-sm text-gray-900 shadow-sm" type="button">
             <img
               src="https://www.svgrepo.com/show/475647/facebook-color.svg"
               className="w-5 h-5"

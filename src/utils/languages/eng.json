@@ -35,7 +35,9 @@
     "rowsPerPage": "Rows per page",
     "showing": "Showing",
     "entries": "branches",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "createdDate": "Created Date",
+    "createdTime": "Created Time"
   },
   "admin": {
     "sidebar": {
