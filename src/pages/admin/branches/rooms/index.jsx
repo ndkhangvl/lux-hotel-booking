@@ -119,7 +119,8 @@ const ROOM_STATUS = {
 };
 
 // ─── Room Dialog ──────────────────────────────────────────────────────────────
-const EMPTY_FORM = { room_number: "", room_type_id: "", price: "", del_flg: 0, amenity_ids: [] };
+const EMPTY_FORM = { room_type_id: "", price: "", people_number: "1", del_flg: 0, amenity_ids: [] };
+const EMPTY_BRANCH_ROOM_FORM = { room_id: "", room_number: "", del_flg: 0 };
 
 const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) => {
   const { t } = useLanguage();
@@ -136,10 +137,10 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
       setForm(
         mode === "update" && initialData
           ? {
-              room_number: initialData.room_number ?? "",
               room_type_id: String(initialData.room_type_id ?? ""),
 
               price: String(initialData.price ?? ""),
+              people_number: String(initialData.people_number ?? 1),
               del_flg: initialData.del_flg,
               amenity_ids: (initialData.amenities ?? []).map((a) => String(a.amenity_id)),
             }
@@ -182,9 +183,9 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
     setError(null);
     try {
       const body = {
-        room_number: form.room_number,
         room_type_id: form.room_type_id || null,
         price: form.price !== "" ? Number(form.price) : null,
+        people_number: form.people_number !== "" ? Number(form.people_number) : 1,
         del_flg: Number(form.del_flg),
         branch_id: branchId,
         amenity_ids: form.amenity_ids,
@@ -235,9 +236,6 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
               <h3 className="text-base font-bold text-gray-900">
                 {isUpdate ? t("admin.branches.rooms.dialogUpdateTitle") : t("admin.branches.rooms.dialogInsertTitle")}
               </h3>
-              {isUpdate && initialData && (
-                <p className="text-xs text-gray-400 mt-0.5">{t("admin.branches.rooms.roomNumber")}: {initialData.room_number}</p>
-              )}
             </div>
           </div>
           <button
@@ -251,19 +249,6 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t("admin.branches.rooms.roomNumber")} <span className="text-red-500">*</span>
-              </label>
-              <input
-                name="room_number"
-                value={form.room_number}
-                onChange={handleChange}
-                required
-                placeholder="101"
-                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
-              />
-            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t("admin.branches.rooms.roomType")}
@@ -299,35 +284,17 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t("common.status")}
+                {t("admin.branches.rooms.peopleNumber")}
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(ROOM_STATUS).map(([val, cfg]) => {
-                  const selected = String(form.del_flg) === val;
-                  return (
-                    <label
-                      key={val}
-                      className={cn(
-                        "flex items-center gap-2 px-3.5 py-2.5 rounded-xl border cursor-pointer text-sm font-medium transition-all",
-                        selected
-                          ? cn(cfg.bg, cfg.text, "border-transparent")
-                          : "border-gray-200 text-gray-400 hover:border-gray-300"
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="del_flg"
-                        value={val}
-                        checked={selected}
-                        onChange={handleChange}
-                        className="sr-only"
-                      />
-                      <span className={cn("w-2 h-2 rounded-full flex-shrink-0", selected ? cfg.dot : "bg-gray-300")} />
-                      {t(cfg.labelKey)}
-                    </label>
-                  );
-                })}
-              </div>
+              <input
+                name="people_number"
+                type="number"
+                value={form.people_number}
+                onChange={handleChange}
+                placeholder="2"
+                min={1}
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -397,6 +364,143 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
   );
 };
 
+const BranchRoomDialog = ({ open, mode, initialData, branchId, roomOptions, onClose, onSuccess }) => {
+  const { t } = useLanguage();
+  const [form, setForm] = useState(EMPTY_BRANCH_ROOM_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm(
+      mode === "update" && initialData
+        ? {
+            room_id: String(initialData.room_id ?? ""),
+            room_number: String(initialData.room_number ?? ""),
+            del_flg: Number(initialData.del_flg ?? 0),
+          }
+        : EMPTY_BRANCH_ROOM_FORM
+    );
+    setError(null);
+  }, [open, mode, initialData]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const body = {
+        branch_id: branchId,
+        room_id: form.room_id,
+        room_number: form.room_number.trim(),
+        del_flg: Number(form.del_flg),
+      };
+      if (mode === "update" && initialData?.branch_room_id) {
+        body.branch_room_id = String(initialData.branch_room_id);
+      }
+      const res = await fetch(`${API_BASE}/admin/rooms/branch-rooms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `HTTP ${res.status}`);
+      }
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!open) return null;
+  const isUpdate = mode === "update";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-auto flex flex-col max-h-[90vh]">
+        <div className={cn(
+          "flex items-center justify-between px-6 py-4 border-b border-gray-100 rounded-t-2xl",
+          isUpdate ? "bg-amber-50" : "bg-blue-50"
+        )}>
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "w-9 h-9 rounded-xl flex items-center justify-center",
+              isUpdate ? "bg-amber-100" : "bg-blue-100"
+            )}>
+              {isUpdate ? <Pencil size={16} className="text-amber-600" /> : <Plus size={16} className="text-blue-600" />}
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-gray-900">
+                {t(isUpdate ? "admin.branches.rooms.branchRoomDialogUpdateTitle" : "admin.branches.rooms.branchRoomDialogInsertTitle")}
+              </h3>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("admin.branches.rooms.roomType")}</label>
+              <select
+                name="room_id"
+                value={form.room_id}
+                onChange={handleChange}
+                required
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 transition bg-white"
+              >
+                <option value="">-- {t("admin.branches.rooms.roomType")} --</option>
+                {roomOptions.map((room) => (
+                  <option key={String(room.room_id)} value={String(room.room_id)}>
+                    {room.room_type_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">{t("admin.branches.rooms.roomNumber")}</label>
+              <input
+                name="room_number"
+                value={form.room_number}
+                onChange={handleChange}
+                placeholder="101"
+                required
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+              />
+            </div>
+            {error && (
+              <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+                <AlertCircle size={15} /> {error}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+            <button type="button" onClick={onClose} disabled={submitting} className="px-5 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors">
+              {t("common.cancel")}
+            </button>
+            <button type="submit" disabled={submitting} className={cn("flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-60 transition-colors", isUpdate ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-500 hover:bg-blue-600")}>
+              {submitting && <Loader2 size={14} className="animate-spin" />}
+              {t("common.save")}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 const AdminBranchRooms = () => {
   const { branchId } = useParams();
@@ -404,8 +508,15 @@ const AdminBranchRooms = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const branch = location.state?.branch ?? null;
+  const [activeTab, setActiveTab] = useState("rooms");
 
-  const [stats, setStats] = useState({ total_rooms: 0, available_rooms: 0, occupied_rooms: 0 });
+  const [stats, setStats] = useState({
+    total_rooms: 0,
+    available_rooms: 0,
+    booked_rooms: 0,
+    in_use_rooms: 0,
+    unavailable_rooms: 0,
+  });
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
 
@@ -418,13 +529,26 @@ const AdminBranchRooms = () => {
   const [tableLoading, setTableLoading] = useState(true);
   const [tableError, setTableError] = useState(null);
 
+  const [branchRooms, setBranchRooms] = useState([]);
+  const [branchRoomsTotal, setBranchRoomsTotal] = useState(0);
+  const [branchRoomsTotalPages, setBranchRoomsTotalPages] = useState(1);
+  const [branchRoomsLoading, setBranchRoomsLoading] = useState(true);
+  const [branchRoomsError, setBranchRoomsError] = useState(null);
+  const [roomOptions, setRoomOptions] = useState([]);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState("insert");
   const [dialogData, setDialogData] = useState(null);
+  const [branchRoomDialogOpen, setBranchRoomDialogOpen] = useState(false);
+  const [branchRoomDialogMode, setBranchRoomDialogMode] = useState("insert");
+  const [branchRoomDialogData, setBranchRoomDialogData] = useState(null);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [branchRoomDeleteTarget, setBranchRoomDeleteTarget] = useState(null);
+  const [branchRoomDeleteLoading, setBranchRoomDeleteLoading] = useState(false);
+  const [branchRoomDeleteError, setBranchRoomDeleteError] = useState(null);
 
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
@@ -451,6 +575,7 @@ const AdminBranchRooms = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setRooms(data.items);
+      setRoomOptions(data.items);
       setTotal(data.total);
       setTotalPages(data.total_pages);
     } catch (err) {
@@ -461,8 +586,34 @@ const AdminBranchRooms = () => {
     }
   }, [branchId]);
 
+  const fetchBranchRooms = useCallback(async (currentPage, currentPageSize) => {
+    setBranchRoomsLoading(true);
+    setBranchRoomsError(null);
+    try {
+      const res = await fetch(
+        `${API_BASE}/admin/rooms/branch-rooms-list?branch_id=${branchId}&page=${currentPage}&page_size=${currentPageSize}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setBranchRooms(data.items);
+      setBranchRoomsTotal(data.total);
+      setBranchRoomsTotalPages(data.total_pages);
+    } catch (err) {
+      setBranchRoomsError(err.message);
+      setBranchRooms([]);
+    } finally {
+      setBranchRoomsLoading(false);
+    }
+  }, [branchId]);
+
   useEffect(() => { fetchStats(); }, [fetchStats]);
-  useEffect(() => { fetchRooms(page, pageSize); }, [fetchRooms, page, pageSize]);
+  useEffect(() => {
+    if (activeTab === "rooms") {
+      fetchRooms(page, pageSize);
+      return;
+    }
+    fetchBranchRooms(page, pageSize);
+  }, [activeTab, fetchRooms, fetchBranchRooms, page, pageSize]);
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) setPage(newPage);
@@ -497,11 +648,42 @@ const AdminBranchRooms = () => {
     }
   };
 
-  const filtered = rooms.filter(
+  const handleConfirmDeleteBranchRoom = async () => {
+    if (!branchRoomDeleteTarget) return;
+    setBranchRoomDeleteLoading(true);
+    setBranchRoomDeleteError(null);
+    try {
+      const res = await fetch(`${API_BASE}/admin/rooms/branch-rooms?branch_id=${branchId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ branch_room_id: String(branchRoomDeleteTarget.branch_room_id) }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `HTTP ${res.status}`);
+      }
+      setBranchRoomDeleteTarget(null);
+      fetchBranchRooms(page, pageSize);
+    } catch (err) {
+      setBranchRoomDeleteError(err.message);
+    } finally {
+      setBranchRoomDeleteLoading(false);
+    }
+  };
+
+  const filteredRooms = rooms.filter(
+    (r) =>
+      (r.room_type_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      String(r.people_number ?? "").includes(search.trim())
+  );
+
+  const filteredBranchRooms = branchRooms.filter(
     (r) =>
       (r.room_number ?? "").toLowerCase().includes(search.toLowerCase()) ||
       (r.room_type_name ?? "").toLowerCase().includes(search.toLowerCase())
   );
+
+  const isRoomsTab = activeTab === "rooms";
 
   return (
     <div className="space-y-6">
@@ -526,29 +708,49 @@ const AdminBranchRooms = () => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { fetchStats(); fetchRooms(page, pageSize); }}
-              disabled={statsLoading || tableLoading}
+              onClick={() => {
+                fetchStats();
+                if (isRoomsTab) {
+                  fetchRooms(page, pageSize);
+                  return;
+                }
+                fetchBranchRooms(page, pageSize);
+              }}
+              disabled={statsLoading || tableLoading || branchRoomsLoading}
               className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
             >
-              <RefreshCw size={15} className={cn((statsLoading || tableLoading) && "animate-spin")} />
+              <RefreshCw size={15} className={cn((statsLoading || tableLoading || branchRoomsLoading) && "animate-spin")} />
               {t("common.refresh")}
             </button>
-            <button
-              onClick={() => { setDialogMode("insert"); setDialogData(null); setDialogOpen(true); }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-violet-500 hover:bg-violet-600 text-white rounded-xl text-sm font-semibold transition-colors"
-            >
-              <Plus size={15} />
-              {t("admin.branches.rooms.addRoom")}
-            </button>
+            {isRoomsTab && (
+              <button
+                onClick={() => { setDialogMode("insert"); setDialogData(null); setDialogOpen(true); }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-violet-500 hover:bg-violet-600 text-white rounded-xl text-sm font-semibold transition-colors"
+              >
+                <Plus size={15} />
+                {t("admin.branches.rooms.addRoom")}
+              </button>
+            )}
+            {!isRoomsTab && (
+              <button
+                onClick={() => { setBranchRoomDialogMode("insert"); setBranchRoomDialogData(null); setBranchRoomDialogOpen(true); }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-semibold transition-colors"
+              >
+                <Plus size={15} />
+                {t("admin.branches.rooms.addBranchRoom")}
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatCard label={t("admin.branches.rooms.totalRooms")} value={stats.total_rooms} icon={BedDouble} bg="bg-violet-50" iconColor="text-violet-600" loading={statsLoading} />
         <StatCard label={t("admin.branches.rooms.availableRooms")} value={stats.available_rooms} icon={CheckCircle2} bg="bg-emerald-50" iconColor="text-emerald-600" loading={statsLoading} />
-        <StatCard label={t("admin.branches.rooms.occupiedRooms")} value={stats.occupied_rooms} icon={Layers} bg="bg-orange-50" iconColor="text-orange-500" loading={statsLoading} />
+        <StatCard label={t("admin.branches.rooms.bookedRooms")} value={stats.booked_rooms} icon={Layers} bg="bg-blue-50" iconColor="text-blue-600" loading={statsLoading} />
+        <StatCard label={t("admin.branches.rooms.inUseRooms")} value={stats.in_use_rooms} icon={Hash} bg="bg-amber-50" iconColor="text-amber-600" loading={statsLoading} />
+        <StatCard label={t("admin.branches.rooms.unavailableRooms")} value={stats.unavailable_rooms} icon={X} bg="bg-gray-100" iconColor="text-gray-500" loading={statsLoading} />
       </div>
 
       {statsError && (
@@ -559,166 +761,305 @@ const AdminBranchRooms = () => {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap gap-2">
+          {[
+            { key: "rooms", label: t("admin.branches.rooms.roomsTab") },
+            { key: "branchRooms", label: t("admin.branches.rooms.branchRoomsTab") },
+          ].map((tab) => {
+            const selected = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.key);
+                  setPage(1);
+                  setSearch("");
+                }}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-sm font-semibold border transition-colors",
+                  selected
+                    ? "bg-violet-500 text-white border-violet-500"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                )}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="relative max-w-xs">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("admin.branches.rooms.searchPlaceholder")}
+              placeholder={t(isRoomsTab ? "admin.branches.rooms.searchPlaceholder" : "admin.branches.rooms.branchRoomsSearchPlaceholder")}
               className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-300 transition"
             />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/60">
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  <div className="flex items-center gap-1"><Hash size={11} /> #</div>
-                </th>
-                {[
-                  t("admin.branches.rooms.roomNumber"),
-                  t("admin.branches.rooms.roomType"),
-                  t("admin.branches.rooms.amenities"),
-                  t("admin.branches.rooms.price"),
-                  t("common.status"),
-                  t("common.action"),
-                ].map((label) => (
-                  <th key={label} className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                    {label}
+          {isRoomsTab ? (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/60">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <div className="flex items-center gap-1"><Hash size={11} /> #</div>
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {tableLoading ? (
-                <tr>
-                  <td colSpan={7} className="py-16 text-center">
-                    <div className="flex flex-col items-center gap-2 text-gray-400">
-                      <Loader2 size={24} className="animate-spin text-violet-500" />
-                      <span className="text-sm">{t("common.loading")}</span>
-                    </div>
-                  </td>
+                  {[
+                    t("admin.branches.rooms.roomType"),
+                    t("admin.branches.rooms.amenities"),
+                    t("admin.branches.rooms.price"),
+                    t("admin.branches.rooms.peopleNumber"),
+                    t("admin.branches.rooms.availableRooms"),
+                    t("admin.branches.rooms.bookedRooms"),
+                    t("admin.branches.rooms.inUseRooms"),
+                    t("admin.branches.rooms.unavailableRooms"),
+                    t("common.action"),
+                  ].map((label, index) => (
+                    <th
+                      key={label}
+                      className={cn(
+                        "px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap",
+                        index >= 4 && index <= 7 ? "text-center" : "text-left"
+                      )}
+                    >
+                      {label}
+                    </th>
+                  ))}
                 </tr>
-              ) : tableError ? (
-                <tr>
-                  <td colSpan={7} className="py-16 text-center">
-                    <div className="flex flex-col items-center gap-2 text-red-400">
-                      <AlertCircle size={24} />
-                      <span className="text-sm">{tableError}</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-16 text-center text-sm text-gray-400">
-                    {t("common.noData")}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r, idx) => {
-                  const rowNum = (page - 1) * pageSize + idx + 1;
-                  const statusCfg = ROOM_STATUS[r.del_flg] ?? ROOM_STATUS[0];
-                  return (
-                    <tr key={String(r.room_id)} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="px-6 py-4 text-sm text-gray-400 font-mono">{rowNum}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-400 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                            {String(r.room_number ?? "?").slice(0, 2)}
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {tableLoading ? (
+                  <tr>
+                    <td colSpan={10} className="py-16 text-center">
+                      <div className="flex flex-col items-center gap-2 text-gray-400">
+                        <Loader2 size={24} className="animate-spin text-violet-500" />
+                        <span className="text-sm">{t("common.loading")}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : tableError ? (
+                  <tr>
+                    <td colSpan={10} className="py-16 text-center">
+                      <div className="flex flex-col items-center gap-2 text-red-400">
+                        <AlertCircle size={24} />
+                        <span className="text-sm">{tableError}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredRooms.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-16 text-center text-sm text-gray-400">
+                      {t("common.noData")}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRooms.map((r, idx) => {
+                    const rowNum = (page - 1) * pageSize + idx + 1;
+                    return (
+                      <tr key={String(r.room_id)} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="px-6 py-4 text-sm text-gray-400 font-mono">{rowNum}</td>
+                        <td className="px-4 py-4 text-sm text-gray-600">
+                          {r.room_type_name ?? <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-4">
+                          {r.amenities && r.amenities.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {r.amenities.slice(0, 3).map((a) => (
+                                <span
+                                  key={String(a.amenity_id)}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-violet-50 border border-violet-100 text-xs text-violet-600 whitespace-nowrap"
+                                >
+                                  <Tag size={9} />{a.name}
+                                </span>
+                              ))}
+                              {r.amenities.length > 3 && (
+                                <span className="text-xs text-gray-400 self-center">+{r.amenities.length - 3}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
+                          {r.price != null
+                            ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(r.price)
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
+                          {r.people_number != null ? `${r.people_number} ${t("common.people")}` : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap">
+                          <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700 border border-emerald-200">
+                            {r.available_rooms ?? 0}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap">
+                          <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700 border border-blue-200">
+                            {r.booked_rooms ?? 0}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap">
+                          <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700 border border-amber-200">
+                            {r.in_use_rooms ?? 0}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap">
+                          <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600 border border-gray-200">
+                            {r.unavailable_rooms ?? 0}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => { setDialogMode("update"); setDialogData(r); setDialogOpen(true); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors whitespace-nowrap"
+                            >
+                              <Pencil size={12} />
+                              {t("common.edit")}
+                            </button>
+                            <button
+                              onClick={() => { setDeleteError(null); setDeleteTarget(r); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors whitespace-nowrap"
+                            >
+                              <Trash2 size={12} />
+                              {t("common.delete")}
+                            </button>
                           </div>
-                          <span className="text-sm font-semibold text-gray-800">{r.room_number}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
-                        {r.room_type_name ?? <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-4">
-                        {r.amenities && r.amenities.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {r.amenities.slice(0, 3).map((a) => (
-                              <span
-                                key={String(a.amenity_id)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-violet-50 border border-violet-100 text-xs text-violet-600 whitespace-nowrap"
-                              >
-                                <Tag size={9} />{a.name}
-                              </span>
-                            ))}
-                            {r.amenities.length > 3 && (
-                              <span className="text-xs text-gray-400 self-center">+{r.amenities.length - 3}</span>
-                            )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/60">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <div className="flex items-center gap-1"><Hash size={11} /> #</div>
+                  </th>
+                  {[t("admin.branches.rooms.roomNumber"), t("admin.branches.rooms.roomType"), t("common.status"), t("common.action")].map((label) => (
+                    <th key={label} className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {branchRoomsLoading ? (
+                  <tr>
+                    <td colSpan={4} className="py-16 text-center">
+                      <div className="flex flex-col items-center gap-2 text-gray-400">
+                        <Loader2 size={24} className="animate-spin text-violet-500" />
+                        <span className="text-sm">{t("common.loading")}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : branchRoomsError ? (
+                  <tr>
+                    <td colSpan={4} className="py-16 text-center">
+                      <div className="flex flex-col items-center gap-2 text-red-400">
+                        <AlertCircle size={24} />
+                        <span className="text-sm">{branchRoomsError}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredBranchRooms.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-16 text-center text-sm text-gray-400">
+                      {t("common.noData")}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBranchRooms.map((room, idx) => {
+                    const rowNum = (page - 1) * pageSize + idx + 1;
+                    const statusCfg = ROOM_STATUS[room.del_flg] ?? ROOM_STATUS[0];
+                    return (
+                      <tr key={String(room.branch_room_id)} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="px-6 py-4 text-sm text-gray-400 font-mono">{rowNum}</td>
+                        <td className="px-4 py-4 text-sm font-medium text-gray-700 whitespace-nowrap">{room.room_number}</td>
+                        <td className="px-4 py-4 text-sm text-gray-600">{room.room_type_name ?? <span className="text-gray-300">—</span>}</td>
+                        <td className="px-4 py-4">
+                          <span className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
+                            statusCfg.bg, statusCfg.text
+                          )}>
+                            <span className={cn("w-1.5 h-1.5 rounded-full", statusCfg.dot)} />
+                            {t(statusCfg.labelKey)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => { setBranchRoomDialogMode("update"); setBranchRoomDialogData(room); setBranchRoomDialogOpen(true); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors whitespace-nowrap"
+                            >
+                              <Pencil size={12} />
+                              {t("common.edit")}
+                            </button>
+                            <button
+                              onClick={() => { setBranchRoomDeleteError(null); setBranchRoomDeleteTarget(room); }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors whitespace-nowrap"
+                            >
+                              <Trash2 size={12} />
+                              {t("common.delete")}
+                            </button>
                           </div>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-600 whitespace-nowrap">
-                        {r.price != null
-                          ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(r.price)
-                          : <span className="text-gray-300">—</span>}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold",
-                          statusCfg.bg, statusCfg.text
-                        )}>
-                          <span className={cn("w-1.5 h-1.5 rounded-full", statusCfg.dot)} />
-                          {t(statusCfg.labelKey)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => { setDialogMode("update"); setDialogData(r); setDialogOpen(true); }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors whitespace-nowrap"
-                          >
-                            <Pencil size={12} />
-                            {t("common.edit")}
-                          </button>
-                          <button
-                            onClick={() => { setDeleteError(null); setDeleteTarget(r); }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors whitespace-nowrap"
-                          >
-                            <Trash2 size={12} />
-                            {t("common.delete")}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        {!tableLoading && !tableError && total > 0 && (
+        {!((isRoomsTab ? tableLoading : branchRoomsLoading) || (isRoomsTab ? tableError : branchRoomsError)) && (isRoomsTab ? total : branchRoomsTotal) > 0 && (
           <Pagination
             page={page}
-            totalPages={totalPages}
-            total={total}
+            totalPages={isRoomsTab ? totalPages : branchRoomsTotalPages}
+            total={isRoomsTab ? total : branchRoomsTotal}
             pageSize={pageSize}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
-            loading={tableLoading}
+            loading={isRoomsTab ? tableLoading : branchRoomsLoading}
             t={t}
           />
         )}
       </div>
 
-      <RoomDialog
-        open={dialogOpen}
-        mode={dialogMode}
-        initialData={dialogData}
-        branchId={branchId}
-        onClose={() => setDialogOpen(false)}
-        onSuccess={() => { fetchStats(); fetchRooms(page, pageSize); }}
-      />
+      {isRoomsTab && (
+        <RoomDialog
+          open={dialogOpen}
+          mode={dialogMode}
+          initialData={dialogData}
+          branchId={branchId}
+          onClose={() => setDialogOpen(false)}
+          onSuccess={() => { fetchStats(); fetchRooms(page, pageSize); fetchBranchRooms(page, pageSize); }}
+        />
+      )}
+
+      {!isRoomsTab && (
+        <BranchRoomDialog
+          open={branchRoomDialogOpen}
+          mode={branchRoomDialogMode}
+          initialData={branchRoomDialogData}
+          branchId={branchId}
+          roomOptions={roomOptions}
+          onClose={() => setBranchRoomDialogOpen(false)}
+          onSuccess={() => { fetchBranchRooms(page, pageSize); fetchStats(); }}
+        />
+      )}
 
       {/* Delete confirm */}
-      {deleteTarget && (
+      {isRoomsTab && deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !deleteLoading && setDeleteTarget(null)} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto p-6 flex flex-col gap-4">
@@ -730,7 +1071,7 @@ const AdminBranchRooms = () => {
                 <h3 className="text-base font-bold text-gray-900">{t("admin.branches.rooms.deleteRoom")}</h3>
                 <p className="text-sm text-gray-500 mt-1">{t("admin.branches.rooms.deleteConfirm")}</p>
                 <p className="text-sm font-semibold text-gray-800 mt-2">
-                  {t("admin.branches.rooms.roomNumber")}: {deleteTarget.room_number}
+                  {t("admin.branches.rooms.roomType")}: {deleteTarget.room_type_name ?? "—"}
                 </p>
               </div>
             </div>
@@ -753,6 +1094,48 @@ const AdminBranchRooms = () => {
                 className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl disabled:opacity-60 transition-colors"
               >
                 {deleteLoading && <Loader2 size={14} className="animate-spin" />}
+                {t("common.delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isRoomsTab && branchRoomDeleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => !branchRoomDeleteLoading && setBranchRoomDeleteTarget(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-auto p-6 flex flex-col gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">{t("admin.branches.rooms.deleteBranchRoom")}</h3>
+                <p className="text-sm text-gray-500 mt-1">{t("admin.branches.rooms.deleteBranchRoomConfirm")}</p>
+                <p className="text-sm font-semibold text-gray-800 mt-2">
+                  {t("admin.branches.rooms.roomNumber")}: {branchRoomDeleteTarget.room_number}
+                </p>
+              </div>
+            </div>
+            {branchRoomDeleteError && (
+              <div className="flex items-center gap-2 px-3.5 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+                <AlertCircle size={15} /> {branchRoomDeleteError}
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setBranchRoomDeleteTarget(null)}
+                disabled={branchRoomDeleteLoading}
+                className="px-5 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={handleConfirmDeleteBranchRoom}
+                disabled={branchRoomDeleteLoading}
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl disabled:opacity-60 transition-colors"
+              >
+                {branchRoomDeleteLoading && <Loader2 size={14} className="animate-spin" />}
                 {t("common.delete")}
               </button>
             </div>

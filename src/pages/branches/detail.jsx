@@ -1,6 +1,6 @@
 import { useLanguage } from "@/utils/LanguageContext";
 import API_BASE from "@/utils/api";
-import { BedDouble, ChevronLeft, MapPin, Phone } from "lucide-react";
+import { BedDouble, ChevronLeft, MapPin, Phone, Tag, Users } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
@@ -86,31 +86,60 @@ const BranchDetailPage = () => {
         <h2 className="text-2xl font-bold text-slate-900 mb-6">{t("rooms.allTypes")}</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {(branch.room_types || []).map((roomType, idx) => (
-            <div key={roomType.room_type_id} className="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+          {(branch.rooms || []).map((room, idx) => (
+            <div key={room.room_id} className="group bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
               <div className="relative h-52 overflow-hidden">
                 <img
                   src={MOCK_ROOM_IMAGES[idx % MOCK_ROOM_IMAGES.length]}
-                  alt={roomType.name}
+                  alt={room.room_type_name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                 <span className="absolute top-3 left-3 bg-(--main) text-white text-xs font-bold px-3 py-1 rounded-full">
-                  {roomType.name}
+                  {room.room_type_name}
                 </span>
               </div>
 
               <div className="p-5">
-                <h3 className="text-lg font-bold text-slate-900 mb-1">{roomType.name}</h3>
-                <p className="text-sm text-slate-500 mb-4 line-clamp-2">{roomType.description || "Room type at AuroraHotel"}</p>
+                <h3 className="text-lg font-bold text-slate-900 mb-1">{room.room_type_name}</h3>
+                <p className="text-sm text-slate-500 mb-4 line-clamp-2">{room.description || "Room at AuroraHotel"}</p>
+
+                <div className="space-y-3 mb-4">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700">
+                    <Users className="w-4 h-4 text-(--main)" />
+                    <span>{room.people_number || 0} {t("common.people")}</span>
+                  </div>
+
+                  {room.room_amenities?.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {room.room_amenities.map((amenity) => (
+                        <span
+                          key={`${room.room_id}-${amenity.name}`}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-100"
+                        >
+                          {amenity.icon_url ? (
+                            <img
+                              src={amenity.icon_url}
+                              alt={amenity.name}
+                              className="w-3.5 h-3.5 object-contain"
+                            />
+                          ) : (
+                            <Tag className="w-3 h-3" />
+                          )}
+                          {amenity.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-slate-400">{t("booking.roomPrice")}</p>
-                    <p className="text-xl font-bold text-(--main)">{formatPrice(roomType.price)}</p>
+                    <p className="text-xl font-bold text-(--main)">{formatPrice(room.price)}</p>
                   </div>
                   <Link
-                    to={`/booking?branchId=${branch.branch_id}&roomTypeId=${roomType.room_type_id}`}
+                    to={`/booking?branchId=${branch.branch_id}&roomId=${room.room_id}`}
                     className="bg-(--main) hover:bg-[#52DBA9] text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors"
                   >
                     {t("rooms.bookNow")}
@@ -121,7 +150,7 @@ const BranchDetailPage = () => {
           ))}
         </div>
 
-        {(branch.room_types || []).length === 0 && (
+        {(branch.rooms || []).length === 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-slate-500 mt-2">
             {t("common.noData")}
           </div>
