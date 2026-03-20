@@ -27,13 +27,14 @@ import AdminBranches from "./pages/admin/branches/index";
 import AdminBookings from "./pages/admin/bookings/index";
 import AdminSettings from "./pages/admin/settings/index";
 import AdminBranchRooms from "./pages/admin/branches/rooms/index";
+import AdminLogin from "./pages/admin/login/index";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
 import { ACCESS_TOKEN } from "./utils/constant";
 
 function MainLayout() {
   const location = useLocation();
   const path = location.pathname;
-  const hideLayout = path.startsWith("/admin") || path.startsWith("/login") || path.startsWith("/dashboard-admin");
+  const hideLayout = path.startsWith("/admin") || path.startsWith("/login") || path.startsWith("/admin-login") || path.startsWith("/dashboard-admin");
 
   if (hideLayout) {
     return <Outlet />;
@@ -85,7 +86,7 @@ function RequireAdmin({ children }) {
   const location = useLocation();
 
   if (!getAccessToken() || !hasAdminAccess()) {
-    return <Navigate to="/" state={{ from: location }} replace />;
+    return <Navigate to="/admin-login" state={{ from: location }} replace />;
   }
 
   return children;
@@ -146,6 +147,11 @@ const router = createBrowserRouter([
         ),
       },
     ],
+  },
+  {
+    path: "/admin-login",
+    element: <AdminLogin />,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/admin",
