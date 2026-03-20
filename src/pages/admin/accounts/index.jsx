@@ -9,6 +9,8 @@ import {
   UserCheck,
   UserX,
   ChevronDown,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useLanguage } from "@/utils/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -84,6 +86,10 @@ const AdminAccounts = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [passwordVisibility, setPasswordVisibility] = useState({
+    password: false,
+    confirmPassword: false,
+  });
   const [deleteId, setDeleteId] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -128,6 +134,7 @@ const AdminAccounts = () => {
   const openAdd = () => {
     setEditItem(null);
     setForm(EMPTY_FORM);
+    setPasswordVisibility({ password: false, confirmPassword: false });
     setModalOpen(true);
   };
   const openEdit = (item) => {
@@ -137,11 +144,13 @@ const AdminAccounts = () => {
       password: "",
       confirmPassword: "",
     });
+    setPasswordVisibility({ password: false, confirmPassword: false });
     setModalOpen(true);
   };
   const closeModal = () => {
     setModalOpen(false);
     setEditItem(null);
+    setPasswordVisibility({ password: false, confirmPassword: false });
   };
 
   // ADD/EDIT user with FastAPI API
@@ -431,13 +440,37 @@ const AdminAccounts = () => {
               ].map(({ label, field, type }) => (
                 <div key={field}>
                   <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">{label}</label>
-                  <input
-                    type={type}
-                    value={form[field] || ""}
-                    onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 transition"
-                    autoComplete={field === "password" || field === "confirmPassword" ? "new-password" : undefined}
-                  />
+                  {field === "password" || field === "confirmPassword" ? (
+                    <div className="relative">
+                      <input
+                        type={passwordVisibility[field] ? "text" : "password"}
+                        value={form[field] || ""}
+                        onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
+                        className="w-full px-3 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 transition"
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPasswordVisibility((prev) => ({
+                            ...prev,
+                            [field]: !prev[field],
+                          }))
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        aria-label={passwordVisibility[field] ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                      >
+                        {passwordVisibility[field] ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type={type}
+                      value={form[field] || ""}
+                      onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 transition"
+                    />
+                  )}
                 </div>
               ))}
               <div className="grid grid-cols-2 gap-4">

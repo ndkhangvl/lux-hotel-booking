@@ -13,6 +13,8 @@ import Login from "./pages/auth/login";
 import Header from "./pages/common/header";
 import Footer from "./pages/common/footer";
 import Home from "./pages/home";
+import BranchesPage from "./pages/branches-page";
+import BranchDetailPage from "./pages/branches/detail";
 import RoomsPage from "./pages/rooms/index";
 import ServicesPage from "./pages/services/index";
 import BlogPage from "./pages/blog/index";
@@ -102,6 +104,14 @@ const router = createBrowserRouter([
       {
         path: "rooms",
         element: <RoomsPage />,
+      },
+      {
+        path: "branches",
+        element: <BranchesPage />,
+      },
+      {
+        path: "branches/:branchId",
+        element: <BranchDetailPage />,
       },
       {
         path: "services",

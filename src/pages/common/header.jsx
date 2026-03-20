@@ -7,8 +7,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { HotelShareIcon } from "@/utils/share_icon";
-import { ArrowRight, Facebook, Search } from "lucide-react";
-import React, { useState } from "react";
+import { ACCESS_TOKEN } from "@/utils/constant";
+import { ArrowRight, Eye, EyeOff, Facebook, LogOut, Search } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import API_BASE from "@/utils/api";
 import axios from "axios";
@@ -21,10 +22,30 @@ const NAV_LINKS = [
   { key: "contact", path: "/contact" },
 ];
 
+const getAccessToken = () => {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(ACCESS_TOKEN);
+};
+
+const parseTokenPayload = (token) => {
+  if (!token) return null;
+
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+  } catch {
+    return null;
+  }
+};
+
 const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [showRegisterConfirmPassword, setShowRegisterConfirmPassword] = useState(false);
   const [loginForm, setLoginForm] = useState({
     username: "",
     password: "",
@@ -41,9 +62,32 @@ const Header = () => {
   const [registerLoading, setRegisterLoading] = useState(false);
   const [registerError, setRegisterError] = useState("");
   const [registerSuccess, setRegisterSuccess] = useState("");
+  const [authState, setAuthState] = useState(() => {
+    const token = getAccessToken();
+    const payload = parseTokenPayload(token);
+    return {
+      isLoggedIn: Boolean(token),
+      role: payload?.role ?? null,
+    };
+  });
   const location = useLocation();
   const { t, lang, switchLang } = useLanguage();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const syncAuthState = () => {
+      const token = getAccessToken();
+      const payload = parseTokenPayload(token);
+      setAuthState({
+        isLoggedIn: Boolean(token),
+        role: payload?.role ?? null,
+      });
+    };
+
+    syncAuthState();
+    window.addEventListener("storage", syncAuthState);
+    return () => window.removeEventListener("storage", syncAuthState);
+  }, [location.pathname]);
 
   const isActive = (path) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
@@ -84,7 +128,7 @@ const Header = () => {
         password: loginForm.password,
       });
       if (res.data?.access_token) {
-        localStorage.setItem("accessToken", res.data.access_token);
+        localStorage.setItem(ACCESS_TOKEN, res.data.access_token);
 
         // Decode JWT user role
         const accessToken = res.data.access_token;
@@ -99,11 +143,14 @@ const Header = () => {
           }
         }
 
+        setAuthState({ isLoggedIn: true, role });
+
         setAuthOpen(false);
         setLoginForm({
           username: "",
           password: "",
         });
+        setShowLoginPassword(false);
         setLoginError("");
 
         // Điều hướng theo role
@@ -123,6 +170,14 @@ const Header = () => {
       );
     }
     setLoginLoading(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(ACCESS_TOKEN);
+    setAuthState({ isLoggedIn: false, role: null });
+    setAuthOpen(false);
+    setRegisterOpen(false);
+    navigate("/", { replace: true });
   };
 
   // Register API handler (dựa trên FastAPI /register)
@@ -165,6 +220,8 @@ const Header = () => {
         password: "",
         confirmPassword: "",
       });
+      setShowRegisterPassword(false);
+      setShowRegisterConfirmPassword(false);
 
       setTimeout(() => {
         setRegisterOpen(false);
@@ -231,13 +288,24 @@ const Header = () => {
               >
                 {t("nav.bookNow")} <ArrowRight className="w-4 h-4" />
               </Link>
-              <button
-                type="button"
-                onClick={() => setAuthOpen(true)}
-                className="hidden sm:flex items-center gap-2 border border-gray-200 hover:border-(--main) text-slate-700 hover:text-(--main) px-5 py-2.5 rounded-full font-semibold text-sm transition-all"
-              >
-                {t("auth.loginRegister")}
-              </button>
+              {authState.isLoggedIn ? (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="hidden sm:flex items-center gap-2 border border-gray-200 hover:border-red-300 text-slate-700 hover:text-red-500 px-5 py-2.5 rounded-full font-semibold text-sm transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                  {t("admin.header.logout")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAuthOpen(true)}
+                  className="hidden sm:flex items-center gap-2 border border-gray-200 hover:border-(--main) text-slate-700 hover:text-(--main) px-5 py-2.5 rounded-full font-semibold text-sm transition-all"
+                >
+                  {t("auth.loginRegister")}
+                </button>
+              )}
               {/* Language Switcher */}
               <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-full p-1">
                 <button
@@ -298,16 +366,30 @@ const Header = () => {
             </Link>
           </div>
           <div className="flex items-center justify-center pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                setMobileOpen(false);
-                setAuthOpen(true);
-              }}
-              className="w-full border border-gray-200 hover:border-(--main) text-slate-700 hover:text-(--main) py-3 rounded-xl font-semibold transition-all"
-            >
-              {t("auth.loginRegister")}
-            </button>
+            {authState.isLoggedIn ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  handleLogout();
+                }}
+                className="w-full border border-gray-200 hover:border-red-300 text-slate-700 hover:text-red-500 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                {t("admin.header.logout")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  setAuthOpen(true);
+                }}
+                className="w-full border border-gray-200 hover:border-(--main) text-slate-700 hover:text-(--main) py-3 rounded-xl font-semibold transition-all"
+              >
+                {t("auth.loginRegister")}
+              </button>
+            )}
           </div>
           {/* Mobile Language Switcher */}
           <div className="flex items-center justify-center gap-2 pt-2">
@@ -358,16 +440,27 @@ const Header = () => {
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                   {t("auth.password")}
                 </label>
-                <input
-                  type="password"
-                  name="password"
-                  autoComplete="current-password"
-                  value={loginForm.password}
-                  onChange={handleLoginChange}
-                  disabled={loginLoading}
-                  placeholder={t("auth.passwordPlaceholder")}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
-                />
+                <div className="relative">
+                  <input
+                    type={showLoginPassword ? "text" : "password"}
+                    name="password"
+                    autoComplete="current-password"
+                    value={loginForm.password}
+                    onChange={handleLoginChange}
+                    disabled={loginLoading}
+                    placeholder={t("auth.passwordPlaceholder")}
+                    className="w-full px-4 pr-11 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword((prev) => !prev)}
+                    disabled={loginLoading}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+                    aria-label={showLoginPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  >
+                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {loginError && (
@@ -418,6 +511,7 @@ const Header = () => {
                   setAuthOpen(false);
                   setRegisterOpen(true);
                   setLoginForm({ username: "", password: "" });
+                  setShowLoginPassword(false);
                   setLoginError("");
                 }}
                 className="text-(--main) font-semibold hover:underline"
@@ -485,30 +579,52 @@ const Header = () => {
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                   {t("auth.password")}
                 </label>
-                <input
-                  type="password"
-                  name="password"
-                  value={registerForm.password}
-                  onChange={handleRegisterChange}
-                  placeholder={t("auth.passwordPlaceholder")}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
-                  disabled={registerLoading}
-                />
+                <div className="relative">
+                  <input
+                    type={showRegisterPassword ? "text" : "password"}
+                    name="password"
+                    value={registerForm.password}
+                    onChange={handleRegisterChange}
+                    placeholder={t("auth.passwordPlaceholder")}
+                    className="w-full px-4 pr-11 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                    disabled={registerLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegisterPassword((prev) => !prev)}
+                    disabled={registerLoading}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+                    aria-label={showRegisterPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  >
+                    {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                   {t("auth.confirmPassword")}
                 </label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={registerForm.confirmPassword}
-                  onChange={handleRegisterChange}
-                  placeholder={t("auth.confirmPasswordPlaceholder")}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
-                  disabled={registerLoading}
-                />
+                <div className="relative">
+                  <input
+                    type={showRegisterConfirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    value={registerForm.confirmPassword}
+                    onChange={handleRegisterChange}
+                    placeholder={t("auth.confirmPasswordPlaceholder")}
+                    className="w-full px-4 pr-11 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                    disabled={registerLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegisterConfirmPassword((prev) => !prev)}
+                    disabled={registerLoading}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+                    aria-label={showRegisterConfirmPassword ? "Ẩn mật khẩu xác nhận" : "Hiện mật khẩu xác nhận"}
+                  >
+                    {showRegisterConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {registerError && (
@@ -540,6 +656,7 @@ const Header = () => {
                   setRegisterOpen(false);
                   setAuthOpen(true);
                   setLoginForm({ username: "", password: "" });
+                  setShowLoginPassword(false);
                   setLoginError("");
                   setRegisterForm({
                     fullName: "",
@@ -548,6 +665,8 @@ const Header = () => {
                     password: "",
                     confirmPassword: "",
                   });
+                  setShowRegisterPassword(false);
+                  setShowRegisterConfirmPassword(false);
                   setRegisterError("");
                   setRegisterSuccess("");
                 }}
