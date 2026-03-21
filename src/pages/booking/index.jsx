@@ -345,7 +345,7 @@ const BookingPage = () => {
         },
         body: JSON.stringify({
           user_id: userId,
-          branch_id: selectedRoom.branch_id || branchId || null,
+          branch_code: selectedRoom.branch_code || branchId || null,
           branch_room_id: selectedRoom.branch_room_id || null,
           room_id: selectedRoom.room_id,
           customer_name: form.name.trim(),

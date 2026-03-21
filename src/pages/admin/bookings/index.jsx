@@ -38,7 +38,7 @@ const EMPTY_FORM = {
   customer_name: "",
   customer_email: "",
   customer_phonenumber: "",
-  branch_id: "",
+  branch_code: "",
   room_id: "",
   from_date: "",
   to_date: "",
@@ -102,7 +102,7 @@ const mapBooking = (booking) => ({
   room: booking.room_number || "-",
   roomType: booking.room_type_name || "-",
   branch: booking.branch_name || "-",
-  branchId: booking.branch_id || "",
+  branchId: booking.branch_code || "",
   roomId: booking.room_id || "",
   checkIn: booking.from_date,
   checkOut: booking.to_date,
@@ -163,7 +163,7 @@ const AdminBookings = () => {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/admin/rooms/rooms-list?branch_id=${branchId}&page=1&page_size=100`);
+      const res = await fetch(`${API_BASE}/admin/rooms/rooms-list?branch_code=${branchId}&page=1&page_size=100`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setRooms(Array.isArray(data?.items) ? data.items.filter((room) => Number(room.del_flg) === 0) : []);
@@ -179,8 +179,8 @@ const AdminBookings = () => {
 
   useEffect(() => {
     if (!modalOpen || editItem) return;
-    loadRooms(form.branch_id);
-  }, [modalOpen, editItem, form.branch_id]);
+    loadRooms(form.branch_code);
+  }, [modalOpen, editItem, form.branch_code]);
 
   const filtered = useMemo(() => bookings.filter((booking) => {
     const keyword = search.trim().toLowerCase();
@@ -211,7 +211,7 @@ const AdminBookings = () => {
       customer_name: item.guest,
       customer_email: item.email,
       customer_phonenumber: item.phone,
-      branch_id: item.branchId,
+      branch_code: item.branchId,
       room_id: item.roomId,
       from_date: item.checkIn,
       to_date: item.checkOut,
@@ -231,7 +231,7 @@ const AdminBookings = () => {
   };
 
   const handleFormChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value, ...(field === "branch_id" ? { room_id: "" } : {}) }));
+    setForm((prev) => ({ ...prev, [field]: value, ...(field === "branch_code" ? { room_id: "" } : {}) }));
   };
 
   const handleSave = async () => {
@@ -265,7 +265,7 @@ const AdminBookings = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             user_id: null,
-            branch_id: form.branch_id,
+            branch_code: form.branch_code,
             room_id: form.room_id,
             customer_name: form.customer_name.trim(),
             customer_email: form.customer_email.trim(),
@@ -456,9 +456,9 @@ const AdminBookings = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">{t("admin.bookings.branch")}</label>
-                    <select value={form.branch_id} onChange={(e) => handleFormChange("branch_id", e.target.value)} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300">
+                    <select value={form.branch_code} onChange={(e) => handleFormChange("branch_code", e.target.value)} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300">
                       <option value="">--</option>
-                      {branches.map((branch) => (<option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>))}
+                      {branches.map((branch) => (<option key={branch.branch_code} value={branch.branch_code}>{branch.name}</option>))}
                     </select>
                   </div>
                   <div>

@@ -305,8 +305,8 @@ const Header = () => {
 
                       {!branchesLoading && branches.length > 0 && branches.map((branch) => (
                         <Link
-                          key={branch.branch_id}
-                          to={`/branches/${branch.branch_id}`}
+                          key={branch.branch_code}
+                          to={`/branches/${branch.branch_code}`}
                           className="flex items-start gap-3 rounded-xl px-3 py-3 hover:bg-slate-50 transition-colors"
                         >
                           <div className="w-9 h-9 rounded-xl bg-[#ECFDF5] text-(--main) flex items-center justify-center shrink-0">
@@ -438,8 +438,8 @@ const Header = () => {
             <div className="space-y-2 pl-4 border-l-2 border-slate-100">
               {branches.slice(0, 5).map((branch) => (
                 <Link
-                  key={branch.branch_id}
-                  to={`/branches/${branch.branch_id}`}
+                  key={branch.branch_code}
+                  to={`/branches/${branch.branch_code}`}
                   onClick={() => setMobileOpen(false)}
                   className="block py-2 text-sm text-slate-500 hover:text-(--main)"
                 >

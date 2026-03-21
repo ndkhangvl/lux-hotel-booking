@@ -649,7 +649,7 @@ const AdminBranchRooms = () => {
     setStatsLoading(true);
     setStatsError(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/rooms/initialize?branch_id=${branchId}&${buildDateRangeQuery()}`);
+      const res = await fetch(`${API_BASE}/admin/rooms/initialize?branch_code=${branchId}&${buildDateRangeQuery()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setStats(data);
@@ -672,7 +672,7 @@ const AdminBranchRooms = () => {
     setTableError(null);
     try {
       const res = await fetch(
-        `${API_BASE}/admin/rooms/rooms-list?branch_id=${branchId}&${buildDateRangeQuery()}&page=${currentPage}&page_size=${currentPageSize}`
+        `${API_BASE}/admin/rooms/rooms-list?branch_code=${branchId}&${buildDateRangeQuery()}&page=${currentPage}&page_size=${currentPageSize}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -700,7 +700,7 @@ const AdminBranchRooms = () => {
     setBranchRoomsError(null);
     try {
       const res = await fetch(
-        `${API_BASE}/admin/rooms/branch-rooms-list?branch_id=${branchId}&${buildDateRangeQuery()}&page=${currentPage}&page_size=${currentPageSize}`
+        `${API_BASE}/admin/rooms/branch-rooms-list?branch_code=${branchId}&${buildDateRangeQuery()}&page=${currentPage}&page_size=${currentPageSize}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -793,7 +793,7 @@ const AdminBranchRooms = () => {
       for (const [index, file] of imageUploadFiles.entries()) {
         const formData = new FormData();
         formData.append("room_id", String(imageDialogRoom.room_id));
-        formData.append("branch_id", String(branchId));
+        formData.append("branch_code", String(branchId));
         formData.append("sort_order", String(roomImages.length + index + 1));
         formData.append("is_thumbnail", roomImages.length === 0 && index === 0 ? "true" : "false");
         formData.append("file", file);
