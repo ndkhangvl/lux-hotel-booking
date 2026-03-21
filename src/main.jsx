@@ -28,6 +28,7 @@ import AdminBookings from "./pages/admin/bookings/index";
 import AdminSettings from "./pages/admin/settings/index";
 import AdminBranchRooms from "./pages/admin/branches/rooms/index";
 import AdminLogin from "./pages/admin/login/index";
+import AdminLogs from "./pages/admin/logs/index";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
 import { ACCESS_TOKEN } from "./utils/constant";
 
@@ -185,6 +186,10 @@ const router = createBrowserRouter([
       {
         path: "settings",
         element: <AdminSettings />,
+      },
+      {
+        path: "logs",
+        element: <AdminLogs />,
       },
     ],
   },

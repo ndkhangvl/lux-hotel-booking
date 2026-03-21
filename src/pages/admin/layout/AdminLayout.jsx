@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Menu,
   X,
+  History,
 } from "lucide-react";
 import { HotelShareIcon } from "@/utils/share_icon";
 import { useLanguage } from "@/utils/LanguageContext";
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { key: "admin.sidebar.accounts", path: "/admin/accounts", icon: Users },
   { key: "admin.sidebar.branches", path: "/admin/branches", icon: GitBranch },
   { key: "admin.sidebar.bookings", path: "/admin/bookings", icon: CalendarCheck },
+  { key: "Lịch sử thao tác", path: "/admin/logs", icon: History },
   { key: "admin.sidebar.settings", path: "/admin/settings", icon: Settings },
 ];
 
