@@ -4,6 +4,7 @@ import {
   Search,
   BedDouble,
   CheckCircle2,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -12,6 +13,8 @@ import {
   ArrowLeft,
   Plus,
   Pencil,
+  Image as ImageIcon,
+  UploadCloud,
   Trash2,
   X,
   Hash,
@@ -116,6 +119,75 @@ const ROOM_STATUS = {
   1: { labelKey: "admin.branches.rooms.statusBooked",    bg: "bg-blue-100",    text: "text-blue-700",    dot: "bg-blue-500" },
   2: { labelKey: "admin.branches.rooms.statusInUse",     bg: "bg-amber-100",   text: "text-amber-700",   dot: "bg-amber-500" },
   3: { labelKey: "admin.branches.rooms.statusUnavailable", bg: "bg-gray-100",  text: "text-gray-500",    dot: "bg-gray-400" },
+};
+
+const extractGoogleDriveFileId = (url) => {
+  if (!url) return null;
+
+  const directIdMatch = url.match(/[?&]id=([^&]+)/i);
+  if (directIdMatch?.[1]) return directIdMatch[1];
+
+  const filePathMatch = url.match(/\/d\/([^/]+)/i);
+  if (filePathMatch?.[1]) return filePathMatch[1];
+
+  return null;
+};
+
+const buildRoomImageSources = (url) => {
+  if (!url) return [];
+
+  const driveFileId = extractGoogleDriveFileId(url);
+  const sources = driveFileId
+    ? [
+        `https://lh3.googleusercontent.com/d/${driveFileId}=w1600`,
+        `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w1600`,
+        `https://drive.google.com/uc?export=view&id=${driveFileId}`,
+        url,
+      ]
+    : [url];
+
+  return [...new Set(sources.filter(Boolean))];
+};
+
+const RoomImagePreview = ({ imageUrl, alt, className }) => {
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [isBroken, setIsBroken] = useState(false);
+  const sources = buildRoomImageSources(imageUrl);
+  const currentSource = sources[sourceIndex] ?? null;
+
+  useEffect(() => {
+    setSourceIndex(0);
+    setIsBroken(false);
+  }, [imageUrl]);
+
+  if (!currentSource || isBroken) {
+    return (
+      <div className={cn("flex items-center justify-center bg-slate-100 text-slate-400", className)}>
+        <div className="flex flex-col items-center gap-2 px-4 text-center">
+          <ImageIcon size={28} />
+          <span className="text-xs font-medium">Image unavailable</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={currentSource}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onLoad={() => setIsBroken(false)}
+      onError={() => {
+        if (sourceIndex < sources.length - 1) {
+          setSourceIndex(sourceIndex + 1);
+          return;
+        }
+        setIsBroken(true);
+      }}
+    />
+  );
 };
 
 // ─── Room Dialog ──────────────────────────────────────────────────────────────
@@ -509,6 +581,8 @@ const AdminBranchRooms = () => {
   const { t } = useLanguage();
   const branch = location.state?.branch ?? null;
   const [activeTab, setActiveTab] = useState("rooms");
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   const [stats, setStats] = useState({
     total_rooms: 0,
@@ -539,6 +613,17 @@ const AdminBranchRooms = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState("insert");
   const [dialogData, setDialogData] = useState(null);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [imageDialogRoom, setImageDialogRoom] = useState(null);
+  const [roomImages, setRoomImages] = useState([]);
+  const [roomImagesLoading, setRoomImagesLoading] = useState(false);
+  const [roomImagesError, setRoomImagesError] = useState(null);
+  const [imageUploadFiles, setImageUploadFiles] = useState([]);
+  const [imageUploadLoading, setImageUploadLoading] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState(null);
+  const [imageDeleteLoadingId, setImageDeleteLoadingId] = useState(null);
+  const [imageDeleteError, setImageDeleteError] = useState(null);
+  const [isImageDropActive, setIsImageDropActive] = useState(false);
   const [branchRoomDialogOpen, setBranchRoomDialogOpen] = useState(false);
   const [branchRoomDialogMode, setBranchRoomDialogMode] = useState("insert");
   const [branchRoomDialogData, setBranchRoomDialogData] = useState(null);
@@ -550,11 +635,21 @@ const AdminBranchRooms = () => {
   const [branchRoomDeleteLoading, setBranchRoomDeleteLoading] = useState(false);
   const [branchRoomDeleteError, setBranchRoomDeleteError] = useState(null);
 
+  const hasInvalidDateRange = Boolean(startDate && endDate && endDate < startDate);
+
+  const buildDateRangeQuery = () => `start_date=${startDate}&end_date=${endDate}`;
+
   const fetchStats = useCallback(async () => {
+    if (hasInvalidDateRange) {
+      setStatsError(t("admin.branches.rooms.invalidDateRange"));
+      setStatsLoading(false);
+      return;
+    }
+
     setStatsLoading(true);
     setStatsError(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/rooms/initialize?branch_code=${branchId}`);
+      const res = await fetch(`${API_BASE}/admin/rooms/initialize?branch_id=${branchId}&${buildDateRangeQuery()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setStats(data);
@@ -563,14 +658,21 @@ const AdminBranchRooms = () => {
     } finally {
       setStatsLoading(false);
     }
-  }, [branchId]);
+  }, [branchId, endDate, hasInvalidDateRange, startDate, t]);
 
   const fetchRooms = useCallback(async (currentPage, currentPageSize) => {
+    if (hasInvalidDateRange) {
+      setTableError(t("admin.branches.rooms.invalidDateRange"));
+      setTableLoading(false);
+      setRooms([]);
+      return;
+    }
+
     setTableLoading(true);
     setTableError(null);
     try {
       const res = await fetch(
-        `${API_BASE}/admin/rooms/rooms-list?branch_code=${branchId}&page=${currentPage}&page_size=${currentPageSize}`
+        `${API_BASE}/admin/rooms/rooms-list?branch_id=${branchId}&${buildDateRangeQuery()}&page=${currentPage}&page_size=${currentPageSize}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -584,14 +686,21 @@ const AdminBranchRooms = () => {
     } finally {
       setTableLoading(false);
     }
-  }, [branchId]);
+  }, [branchId, endDate, hasInvalidDateRange, startDate, t]);
 
   const fetchBranchRooms = useCallback(async (currentPage, currentPageSize) => {
+    if (hasInvalidDateRange) {
+      setBranchRoomsError(t("admin.branches.rooms.invalidDateRange"));
+      setBranchRoomsLoading(false);
+      setBranchRooms([]);
+      return;
+    }
+
     setBranchRoomsLoading(true);
     setBranchRoomsError(null);
     try {
       const res = await fetch(
-        `${API_BASE}/admin/rooms/branch-rooms-list?branch_code=${branchId}&page=${currentPage}&page_size=${currentPageSize}`
+        `${API_BASE}/admin/rooms/branch-rooms-list?branch_id=${branchId}&${buildDateRangeQuery()}&page=${currentPage}&page_size=${currentPageSize}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -604,7 +713,7 @@ const AdminBranchRooms = () => {
     } finally {
       setBranchRoomsLoading(false);
     }
-  }, [branchId]);
+  }, [branchId, endDate, hasInvalidDateRange, startDate, t]);
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
   useEffect(() => {
@@ -622,6 +731,120 @@ const AdminBranchRooms = () => {
   const handlePageSizeChange = (newSize) => {
     setPageSize(newSize);
     setPage(1);
+  };
+
+  const handleImageFileSelect = (files) => {
+    setImageUploadError(null);
+    setImageUploadFiles(Array.isArray(files) ? files : []);
+  };
+
+  const loadRoomImages = async (room) => {
+    setRoomImages([]);
+    setRoomImagesError(null);
+    setRoomImagesLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/room-images/room/${room.room_id}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setRoomImages(Array.isArray(data?.items) ? data.items : []);
+    } catch (err) {
+      setRoomImagesError(err.message || t("common.noData"));
+    } finally {
+      setRoomImagesLoading(false);
+    }
+  };
+
+  const handleOpenImageDialog = async (room) => {
+    setImageDialogOpen(true);
+    setImageDialogRoom(room);
+    setImageUploadFiles([]);
+    setImageUploadError(null);
+    setImageDeleteError(null);
+    setIsImageDropActive(false);
+    await loadRoomImages(room);
+  };
+
+  const handleCloseImageDialog = () => {
+    setImageDialogOpen(false);
+    setImageDialogRoom(null);
+    setRoomImages([]);
+    setRoomImagesError(null);
+    setRoomImagesLoading(false);
+    setImageUploadFiles([]);
+    setImageUploadError(null);
+    setImageUploadLoading(false);
+    setImageDeleteLoadingId(null);
+    setImageDeleteError(null);
+    setIsImageDropActive(false);
+  };
+
+  const handleUploadRoomImage = async () => {
+    if (!imageDialogRoom) return;
+    if (imageUploadFiles.length === 0) {
+      setImageUploadError(t("admin.branches.rooms.selectImageFirst"));
+      return;
+    }
+
+    setImageUploadLoading(true);
+    setImageUploadError(null);
+
+    try {
+      for (const [index, file] of imageUploadFiles.entries()) {
+        const formData = new FormData();
+        formData.append("room_id", String(imageDialogRoom.room_id));
+        formData.append("branch_id", String(branchId));
+        formData.append("sort_order", String(roomImages.length + index + 1));
+        formData.append("is_thumbnail", roomImages.length === 0 && index === 0 ? "true" : "false");
+        formData.append("file", file);
+
+        const res = await fetch(`${API_BASE}/room-images/upload`, {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+      }
+
+      setImageUploadFiles([]);
+      await loadRoomImages(imageDialogRoom);
+    } catch (err) {
+      setImageUploadError(err.message || t("booking.bookingFailed"));
+    } finally {
+      setImageUploadLoading(false);
+    }
+  };
+
+  const handleImageDrop = (event) => {
+    event.preventDefault();
+    setIsImageDropActive(false);
+    const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file.type?.startsWith("image/"));
+    handleImageFileSelect(files);
+  };
+
+  const handleDeleteRoomImage = async (imageId) => {
+    if (!imageDialogRoom || !imageId) return;
+
+    setImageDeleteLoadingId(imageId);
+    setImageDeleteError(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/room-images/${imageId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      await loadRoomImages(imageDialogRoom);
+    } catch (err) {
+      setImageDeleteError(err.message || t("booking.bookingFailed"));
+    } finally {
+      setImageDeleteLoadingId(null);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -653,7 +876,7 @@ const AdminBranchRooms = () => {
     setBranchRoomDeleteLoading(true);
     setBranchRoomDeleteError(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/rooms/branch-rooms?branch_code=${branchId}`, {
+      const res = await fetch(`${API_BASE}/admin/branches/${branchId}/branch-rooms`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ branch_room_id: String(branchRoomDeleteTarget.branch_room_id) }),
@@ -663,6 +886,7 @@ const AdminBranchRooms = () => {
         throw new Error(err.detail ?? `HTTP ${res.status}`);
       }
       setBranchRoomDeleteTarget(null);
+      fetchStats();
       fetchBranchRooms(page, pageSize);
     } catch (err) {
       setBranchRoomDeleteError(err.message);
@@ -671,78 +895,132 @@ const AdminBranchRooms = () => {
     }
   };
 
-  const filteredRooms = rooms.filter(
-    (r) =>
-      (r.room_type_name ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      String(r.people_number ?? "").includes(search.trim())
-  );
-
-  const filteredBranchRooms = branchRooms.filter(
-    (r) =>
-      (r.room_number ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (r.room_type_name ?? "").toLowerCase().includes(search.toLowerCase())
-  );
-
+  const normalizedSearch = search.trim().toLowerCase();
   const isRoomsTab = activeTab === "rooms";
+
+  const filteredRooms = rooms.filter((room) => {
+    if (!normalizedSearch) return true;
+    const amenityNames = Array.isArray(room.amenities) ? room.amenities.map((amenity) => amenity.name) : [];
+    return [room.room_type_name, room.price, room.people_number, ...amenityNames]
+      .some((value) => String(value ?? "").toLowerCase().includes(normalizedSearch));
+  });
+
+  const filteredBranchRooms = branchRooms.filter((room) => {
+    if (!normalizedSearch) return true;
+    return [room.room_number, room.room_type_name]
+      .some((value) => String(value ?? "").toLowerCase().includes(normalizedSearch));
+  });
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb / Back */}
-      <div>
-        <button
-          onClick={() => navigate("/admin/branches")}
-          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors mb-3"
-        >
-          <ArrowLeft size={15} />
-          {t("admin.branches.rooms.backToBranches")}
-        </button>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{t("admin.branches.rooms.title")}</h2>
-            {branch && (
-              <p className="text-sm text-gray-500 mt-0.5">
-                {branch.name}
-                {branch.address && <> &mdash; {branch.address}</>}
-              </p>
-            )}
+      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.94))] shadow-sm">
+        <div className="bg-[radial-gradient(circle_at_top_left,_rgba(139,92,246,0.12),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(14,165,233,0.12),_transparent_28%),linear-gradient(180deg,_#ffffff,_#f8fafc)] px-6 py-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
+              >
+                <ArrowLeft size={15} />
+                {t("common.back")}
+              </button>
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
+                  <BedDouble size={12} />
+                  {isRoomsTab ? t("admin.branches.rooms.roomsTab") : t("admin.branches.rooms.branchRoomsTab")}
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">{branch?.branch_name ?? `Branch #${branchId}`}</h1>
+                  <p className="mt-1 text-sm text-slate-500">{branch?.address ?? branch?.location ?? t("admin.branches.rooms.roomType")}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[420px]">
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                <label htmlFor="branch-rooms-start-date" className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <CalendarDays size={13} />
+                  {t("admin.branches.rooms.startDate")}
+                </label>
+                <input
+                  id="branch-rooms-start-date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                <label htmlFor="branch-rooms-end-date" className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <CalendarDays size={13} />
+                  {t("admin.branches.rooms.endDate")}
+                </label>
+                <input
+                  id="branch-rooms-end-date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                fetchStats();
-                if (isRoomsTab) {
-                  fetchRooms(page, pageSize);
-                  return;
-                }
-                fetchBranchRooms(page, pageSize);
-              }}
-              disabled={statsLoading || tableLoading || branchRoomsLoading}
-              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw size={15} className={cn((statsLoading || tableLoading || branchRoomsLoading) && "animate-spin")} />
-              {t("common.refresh")}
-            </button>
-            {isRoomsTab && (
+
+          <div className="mt-5 flex flex-col gap-3 border-t border-slate-200/80 pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              <span>{t("admin.branches.rooms.availableRooms")}: {stats.available_rooms}</span>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
               <button
-                onClick={() => { setDialogMode("insert"); setDialogData(null); setDialogOpen(true); }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-violet-500 hover:bg-violet-600 text-white rounded-xl text-sm font-semibold transition-colors"
+                onClick={() => {
+                  fetchStats();
+                  if (isRoomsTab) {
+                    fetchRooms(page, pageSize);
+                    return;
+                  }
+                  fetchBranchRooms(page, pageSize);
+                }}
+                disabled={statsLoading || tableLoading || branchRoomsLoading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
-                <Plus size={15} />
-                {t("admin.branches.rooms.addRoom")}
+                <RefreshCw size={15} className={cn((statsLoading || tableLoading || branchRoomsLoading) && "animate-spin")} />
+                {t("common.refresh")}
               </button>
-            )}
-            {!isRoomsTab && (
-              <button
-                onClick={() => { setBranchRoomDialogMode("insert"); setBranchRoomDialogData(null); setBranchRoomDialogOpen(true); }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-semibold transition-colors"
-              >
-                <Plus size={15} />
-                {t("admin.branches.rooms.addBranchRoom")}
-              </button>
-            )}
+              {isRoomsTab ? (
+                <button
+                  onClick={() => { setDialogMode("insert"); setDialogData(null); setDialogOpen(true); }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-600"
+                >
+                  <Plus size={15} />
+                  {t("admin.branches.rooms.addRoom")}
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setBranchRoomDialogMode("insert"); setBranchRoomDialogData(null); setBranchRoomDialogOpen(true); }}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600"
+                >
+                  <Plus size={15} />
+                  {t("admin.branches.rooms.addBranchRoom")}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {hasInvalidDateRange && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+          <AlertCircle size={16} /> {t("admin.branches.rooms.invalidDateRange")}
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
@@ -814,10 +1092,8 @@ const AdminBranchRooms = () => {
                     t("admin.branches.rooms.amenities"),
                     t("admin.branches.rooms.price"),
                     t("admin.branches.rooms.peopleNumber"),
+                    t("admin.branches.rooms.totalRooms"),
                     t("admin.branches.rooms.availableRooms"),
-                    t("admin.branches.rooms.bookedRooms"),
-                    t("admin.branches.rooms.inUseRooms"),
-                    t("admin.branches.rooms.unavailableRooms"),
                     t("common.action"),
                   ].map((label, index) => (
                     <th
@@ -835,7 +1111,7 @@ const AdminBranchRooms = () => {
               <tbody className="divide-y divide-gray-50">
                 {tableLoading ? (
                   <tr>
-                    <td colSpan={10} className="py-16 text-center">
+                    <td colSpan={8} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-2 text-gray-400">
                         <Loader2 size={24} className="animate-spin text-violet-500" />
                         <span className="text-sm">{t("common.loading")}</span>
@@ -844,7 +1120,7 @@ const AdminBranchRooms = () => {
                   </tr>
                 ) : tableError ? (
                   <tr>
-                    <td colSpan={10} className="py-16 text-center">
+                    <td colSpan={8} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-2 text-red-400">
                         <AlertCircle size={24} />
                         <span className="text-sm">{tableError}</span>
@@ -853,13 +1129,14 @@ const AdminBranchRooms = () => {
                   </tr>
                 ) : filteredRooms.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-16 text-center text-sm text-gray-400">
+                    <td colSpan={8} className="py-16 text-center text-sm text-gray-400">
                       {t("common.noData")}
                     </td>
                   </tr>
                 ) : (
                   filteredRooms.map((r, idx) => {
                     const rowNum = (page - 1) * pageSize + idx + 1;
+                    const totalRoomCount = Number(r.available_rooms ?? 0) + Number(r.booked_rooms ?? 0) + Number(r.in_use_rooms ?? 0) + Number(r.unavailable_rooms ?? 0);
                     return (
                       <tr key={String(r.room_id)} className="hover:bg-gray-50/60 transition-colors">
                         <td className="px-6 py-4 text-sm text-gray-400 font-mono">{rowNum}</td>
@@ -894,27 +1171,29 @@ const AdminBranchRooms = () => {
                           {r.people_number != null ? `${r.people_number} ${t("common.people")}` : <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-4 py-4 text-center whitespace-nowrap">
-                          <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700 border border-emerald-200">
+                          <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-violet-50 px-3 py-1 text-sm font-semibold text-violet-700 border border-violet-200">
+                            {totalRoomCount}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center whitespace-nowrap">
+                          <span className={cn(
+                            "inline-flex min-w-10 items-center justify-center rounded-full px-3 py-1 text-sm font-semibold border",
+                            Number(r.available_rooms ?? 0) === 0
+                              ? "bg-red-50 text-red-700 border-red-200"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          )}>
                             {r.available_rooms ?? 0}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-center whitespace-nowrap">
-                          <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700 border border-blue-200">
-                            {r.booked_rooms ?? 0}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-center whitespace-nowrap">
-                          <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700 border border-amber-200">
-                            {r.in_use_rooms ?? 0}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-center whitespace-nowrap">
-                          <span className="inline-flex min-w-10 items-center justify-center rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600 border border-gray-200">
-                            {r.unavailable_rooms ?? 0}
                           </span>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleOpenImageDialog(r)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-colors whitespace-nowrap"
+                            >
+                              <ImageIcon size={12} />
+                              {t("admin.branches.rooms.viewImages")}
+                            </button>
                             <button
                               onClick={() => { setDialogMode("update"); setDialogData(r); setDialogOpen(true); }}
                               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors whitespace-nowrap"
@@ -954,7 +1233,7 @@ const AdminBranchRooms = () => {
               <tbody className="divide-y divide-gray-50">
                 {branchRoomsLoading ? (
                   <tr>
-                    <td colSpan={4} className="py-16 text-center">
+                    <td colSpan={5} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-2 text-gray-400">
                         <Loader2 size={24} className="animate-spin text-violet-500" />
                         <span className="text-sm">{t("common.loading")}</span>
@@ -963,7 +1242,7 @@ const AdminBranchRooms = () => {
                   </tr>
                 ) : branchRoomsError ? (
                   <tr>
-                    <td colSpan={4} className="py-16 text-center">
+                    <td colSpan={5} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-2 text-red-400">
                         <AlertCircle size={24} />
                         <span className="text-sm">{branchRoomsError}</span>
@@ -972,14 +1251,14 @@ const AdminBranchRooms = () => {
                   </tr>
                 ) : filteredBranchRooms.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-16 text-center text-sm text-gray-400">
+                    <td colSpan={5} className="py-16 text-center text-sm text-gray-400">
                       {t("common.noData")}
                     </td>
                   </tr>
                 ) : (
                   filteredBranchRooms.map((room, idx) => {
                     const rowNum = (page - 1) * pageSize + idx + 1;
-                    const statusCfg = ROOM_STATUS[room.del_flg] ?? ROOM_STATUS[0];
+                    const statusCfg = ROOM_STATUS[room.occupancy_status ?? room.del_flg] ?? ROOM_STATUS[0];
                     return (
                       <tr key={String(room.branch_room_id)} className="hover:bg-gray-50/60 transition-colors">
                         <td className="px-6 py-4 text-sm text-gray-400 font-mono">{rowNum}</td>
@@ -1044,6 +1323,182 @@ const AdminBranchRooms = () => {
           onClose={() => setDialogOpen(false)}
           onSuccess={() => { fetchStats(); fetchRooms(page, pageSize); fetchBranchRooms(page, pageSize); }}
         />
+      )}
+
+      {imageDialogOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto p-2 sm:p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCloseImageDialog} />
+          <div className="relative mx-auto my-2 flex max-h-[calc(100vh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-[22px] border border-white/60 bg-white shadow-[0_32px_100px_rgba(15,23,42,0.2)] sm:my-4 sm:max-h-[calc(100vh-2rem)] sm:rounded-[28px]">
+            <div className="border-b border-slate-100 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_36%),linear-gradient(180deg,_#ffffff,_#f8fbff)] px-4 py-4 sm:px-6 sm:py-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 sm:text-xs">
+                    <ImageIcon size={12} /> {t("admin.branches.rooms.roomImagesTitle")}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 sm:text-xl">{imageDialogRoom?.room_type_name ?? "-"}</h3>
+                    <p className="mt-1 pr-2 text-sm leading-6 text-slate-500">{t("admin.branches.rooms.roomImagesHint")}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 sm:justify-end">
+                  <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 sm:px-4 sm:text-sm">
+                    <span className="font-semibold text-slate-900">{roomImages.length}</span>
+                    <span>{t("admin.branches.rooms.imageCount")}</span>
+                  </div>
+                  <button onClick={handleCloseImageDialog} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600">
+                    <X size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)]">
+              <div className="overflow-y-auto border-b border-slate-100 bg-slate-50/70 p-4 sm:p-5 lg:border-b-0 lg:border-r lg:border-slate-100 lg:p-6">
+                <div className="rounded-[20px] border border-sky-100 bg-white p-4 shadow-sm sm:rounded-[24px] sm:p-5">
+                  <div className="mb-4 space-y-1">
+                    <h4 className="text-sm font-semibold text-slate-900">{t("admin.branches.rooms.uploadImageTitle")}</h4>
+                    <p className="text-sm leading-6 text-slate-500">{t("admin.branches.rooms.uploadImageHint")}</p>
+                  </div>
+
+                  <label
+                    htmlFor="room-image-upload-input"
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setIsImageDropActive(true);
+                    }}
+                    onDragLeave={() => setIsImageDropActive(false)}
+                    onDrop={handleImageDrop}
+                    className={cn(
+                      "group flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[20px] border border-dashed px-4 py-6 text-center transition-all sm:min-h-[220px] sm:rounded-[22px] sm:px-6 sm:py-8",
+                      isImageDropActive
+                        ? "border-sky-400 bg-sky-50 shadow-[0_0_0_6px_rgba(14,165,233,0.08)]"
+                        : "border-sky-200 bg-[linear-gradient(180deg,_rgba(240,249,255,0.9),_rgba(255,255,255,1))] hover:border-sky-300 hover:bg-sky-50/80"
+                    )}
+                  >
+                    <input
+                      id="room-image-upload-input"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(event) => handleImageFileSelect(Array.from(event.target.files ?? []))}
+                      className="hidden"
+                    />
+                    <div className={cn(
+                      "mb-4 flex h-16 w-16 items-center justify-center rounded-2xl transition-colors",
+                      isImageDropActive ? "bg-sky-500 text-white" : "bg-sky-100 text-sky-700 group-hover:bg-sky-500 group-hover:text-white"
+                    )}>
+                      <UploadCloud size={28} />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-slate-900 sm:text-base">{t("admin.branches.rooms.dropImageHere")}</p>
+                      <p className="text-sm text-slate-500">{t("admin.branches.rooms.dropImageSubtext")}</p>
+                    </div>
+                  </label>
+
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t("admin.branches.rooms.selectedFileLabel")}</p>
+                      <p className="mt-1 truncate text-sm font-medium text-slate-700">
+                        {imageUploadFiles.length === 0
+                          ? t("admin.branches.rooms.noFileSelected")
+                          : imageUploadFiles.length === 1
+                            ? imageUploadFiles[0].name
+                            : `${imageUploadFiles.length} ảnh đã chọn`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleUploadRoomImage}
+                      disabled={imageUploadLoading}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
+                    >
+                      {imageUploadLoading ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
+                      {t("admin.branches.rooms.addImage")}
+                    </button>
+                  </div>
+
+                  {imageUploadError && (
+                    <div className="mt-4 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-600">
+                      <AlertCircle size={15} /> {imageUploadError}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="min-h-0 overflow-y-auto bg-white p-4 sm:p-5 lg:p-6">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">{t("admin.branches.rooms.gallerySectionTitle")}</h4>
+                    <p className="mt-1 text-sm text-slate-500">{t("admin.branches.rooms.gallerySectionHint")}</p>
+                  </div>
+                  <div className="inline-flex items-center gap-2 self-start rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 sm:hidden">
+                    <span className="text-slate-900">{roomImages.length}</span>
+                    <span>{t("admin.branches.rooms.imageCount")}</span>
+                  </div>
+                </div>
+
+                {imageDeleteError && (
+                  <div className="mb-4 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                    <AlertCircle size={16} /> {imageDeleteError}
+                  </div>
+                )}
+
+                {roomImagesLoading ? (
+                  <div className="py-20 text-center text-sm text-gray-400">
+                    <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> {t("common.loading")}</span>
+                  </div>
+                ) : roomImagesError ? (
+                  <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                    <AlertCircle size={16} /> {roomImagesError}
+                  </div>
+                ) : roomImages.length === 0 ? (
+                  <div className="flex min-h-[240px] flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-slate-50/70 px-5 text-center sm:min-h-[320px] sm:rounded-[24px] sm:px-6">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-200/70 text-slate-500">
+                      <ImageIcon size={26} />
+                    </div>
+                    <p className="text-base font-semibold text-slate-800">{t("admin.branches.rooms.noImages")}</p>
+                    <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">{t("admin.branches.rooms.emptyGalleryHint")}</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {roomImages.map((image) => (
+                      <div key={image._id || image.id} className="group overflow-hidden rounded-[24px] border border-slate-100 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+                        <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+                          <RoomImagePreview imageUrl={image.image_url} alt={imageDialogRoom?.room_type_name || "room"} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+                          <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
+                            <span className="rounded-full bg-black/55 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">#{image.sort_order ?? 1}</span>
+                            <div className="flex items-center gap-2">
+                              {image.is_thumbnail && (
+                                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
+                                  {t("admin.branches.rooms.thumbnail")}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRoomImage(image._id || image.id)}
+                                disabled={imageDeleteLoadingId === (image._id || image.id)}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-white/90 text-red-500 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                aria-label={t("common.delete")}
+                              >
+                                {imageDeleteLoadingId === (image._id || image.id) ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="px-4 py-3">
+                          <p className="truncate text-sm font-medium text-slate-700">{imageDialogRoom?.room_type_name || "-"}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-slate-100 px-4 py-4 sm:px-6">
+              <button onClick={handleCloseImageDialog} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 sm:w-auto sm:py-2">{t("common.close")}</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {!isRoomsTab && (
