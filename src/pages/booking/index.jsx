@@ -1,7 +1,8 @@
 import { useLanguage } from "@/utils/LanguageContext";
 import API_BASE from "@/utils/api";
 import { ACCESS_TOKEN } from "@/utils/constant";
-import { AlertCircle, BedDouble, CalendarCheck, CheckCircle2, Home, Loader2, MapPin, Phone, Tag, Users } from "lucide-react";
+import countries from "@/data/countries.json";
+import { AlertCircle, BadgeCheck, BedDouble, CalendarCheck, CheckCircle2, CreditCard, Home, Landmark, Loader2, MapPin, Phone, Tag, Users, Wallet } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -58,8 +59,44 @@ const normalizeAmenityList = (amenities) =>
       }))
     : [];
 
+const DEFAULT_COUNTRY_CODE = "VN";
+
+const getCountryName = (country, lang) => (lang === "vn" ? country?.name_vi : country?.name) ?? country?.name ?? "";
+
+const normalizePhoneNumber = (value) => String(value || "").replace(/\D/g, "");
+
+const getPhoneParts = (value) => {
+  const cleaned = String(value || "").replace(/[^\d+]/g, "");
+  if (!cleaned) {
+    return { countryCode: DEFAULT_COUNTRY_CODE, phone: "" };
+  }
+
+  const normalized = cleaned.startsWith("+") ? cleaned : `+${cleaned}`;
+
+  const matchedCountry = [...countries]
+    .sort((left, right) => right.dial_code.length - left.dial_code.length)
+    .find((country) => normalized.startsWith(country.dial_code));
+
+  if (!matchedCountry) {
+    return { countryCode: DEFAULT_COUNTRY_CODE, phone: cleaned.replace(/^\+/, "") };
+  }
+
+  return {
+    countryCode: matchedCountry.code,
+    phone: normalized.slice(matchedCountry.dial_code.length),
+  };
+};
+
+const BOOKING_STEPS = ["details", "payment", "confirmation"];
+
+const PAYMENT_METHODS = [
+  { key: "bank_transfer", icon: Landmark },
+  { key: "credit_card", icon: CreditCard },
+  { key: "pay_at_hotel", icon: Wallet },
+];
+
 const BookingPage = () => {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [searchParams] = useSearchParams();
   const roomId = searchParams.get("roomId") || searchParams.get("room");
   const roomTypeId = searchParams.get("roomTypeId");
@@ -77,12 +114,20 @@ const BookingPage = () => {
     guests: 1,
     name: "",
     email: "",
+    countryCode: DEFAULT_COUNTRY_CODE,
     phone: "",
     specialRequests: "",
   });
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [successBooking, setSuccessBooking] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [payment, setPayment] = useState({
+    method: "bank_transfer",
+    cardHolder: "",
+    cardNumber: "",
+    expiryDate: "",
+  });
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -163,11 +208,13 @@ const BookingPage = () => {
         });
         if (!res.ok) throw new Error();
         const profile = await res.json();
+        const phoneParts = profile.phone ? getPhoneParts(profile.phone) : null;
         setForm((prev) => ({
           ...prev,
           name: prev.name || profile.name || "",
           email: prev.email || profile.email || "",
-          phone: prev.phone || profile.phone || "",
+          countryCode: prev.phone ? prev.countryCode : phoneParts?.countryCode || prev.countryCode,
+          phone: prev.phone || phoneParts?.phone || "",
         }));
       } catch {
         // Silent fail: booking page can still work without prefill.
@@ -183,6 +230,14 @@ const BookingPage = () => {
   const total = selectedRoom ? Number(selectedRoom.price || 0) * nights : 0;
   const isLoggedIn = Boolean(userId && getAccessToken());
   const guestLimitExceeded = selectedRoom ? Number(form.guests) > Number(selectedRoom.people_number || 1) : false;
+  const selectedCountry = useMemo(
+    () => countries.find((country) => country.code === form.countryCode) || countries.find((country) => country.code === DEFAULT_COUNTRY_CODE) || countries[0],
+    [form.countryCode],
+  );
+  const dialDigits = normalizePhoneNumber(selectedCountry?.dial_code || "");
+  const maxPhoneDigits = Math.max(1, 15 - dialDigits.length);
+  const guestPhoneFull = `${selectedCountry?.dial_code || ""} ${normalizePhoneNumber(form.phone)}`.trim();
+  const selectedPaymentMethod = PAYMENT_METHODS.find((method) => method.key === payment.method);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -196,32 +251,93 @@ const BookingPage = () => {
       return;
     }
 
+    if (name === "countryCode") {
+      const nextCountry = countries.find((country) => country.code === value);
+      const nextDialDigits = normalizePhoneNumber(nextCountry?.dial_code || "");
+      const nextMaxPhoneDigits = Math.max(1, 15 - nextDialDigits.length);
+      setForm((prev) => ({
+        ...prev,
+        countryCode: value,
+        phone: normalizePhoneNumber(prev.phone).slice(0, nextMaxPhoneDigits),
+      }));
+      return;
+    }
+
+    if (name === "phone") {
+      setForm((prev) => ({
+        ...prev,
+        phone: normalizePhoneNumber(value).slice(0, maxPhoneDigits),
+      }));
+      return;
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const validateBookingStep = () => {
     if (!selectedRoom?.room_id) {
       setSubmitError(t("booking.roomNotFound"));
-      return;
-    }
-    if (!isLoggedIn) {
-      setSubmitError(t("booking.loginRequired"));
-      return;
+      return false;
     }
     if (nights <= 0) {
       setSubmitError(t("booking.invalidDateRange"));
-      return;
+      return false;
     }
     if (guestLimitExceeded) {
       setSubmitError(t("booking.exceedCapacity"));
-      return;
+      return false;
     }
+    if (!form.name.trim() || !form.email.trim()) {
+      setSubmitError(t("booking.missingGuestInfo"));
+      return false;
+    }
+
+    const localPhoneNumber = normalizePhoneNumber(form.phone);
+    const customerPhoneNumber = `${dialDigits}${localPhoneNumber}`;
+    if (!localPhoneNumber || customerPhoneNumber.length > 15) {
+      setSubmitError(t("booking.invalidPhone"));
+      return false;
+    }
+
+    setSubmitError("");
+    return true;
+  };
+
+  const validatePaymentStep = () => {
+    if (!payment.method) {
+      setSubmitError(t("booking.invalidPaymentMethod"));
+      return false;
+    }
+
+    if (payment.method === "credit_card") {
+      if (!payment.cardHolder.trim() || !normalizePhoneNumber(payment.cardNumber) || !payment.expiryDate.trim()) {
+        setSubmitError(t("booking.invalidPaymentMethod"));
+        return false;
+      }
+    }
+
+    setSubmitError("");
+    return true;
+  };
+
+  const goToPaymentStep = () => {
+    if (!validateBookingStep()) return;
+    setCurrentStep(2);
+  };
+
+  const goToConfirmationStep = () => {
+    if (!validatePaymentStep()) return;
+    setCurrentStep(3);
+  };
+
+  const handleSubmit = async () => {
+    if (!validateBookingStep() || !validatePaymentStep()) return;
 
     setSubmitting(true);
     setSubmitError("");
     try {
+      const localPhoneNumber = normalizePhoneNumber(form.phone);
+      const customerPhoneNumber = `${dialDigits}${localPhoneNumber}`;
       const res = await fetch(`${API_BASE}/bookings/user/`, {
         method: "POST",
         headers: {
@@ -229,10 +345,17 @@ const BookingPage = () => {
         },
         body: JSON.stringify({
           user_id: userId,
+          branch_id: selectedRoom.branch_id || branchId || null,
+          branch_room_id: selectedRoom.branch_room_id || null,
           room_id: selectedRoom.room_id,
+          customer_name: form.name.trim(),
+          customer_email: form.email.trim(),
+          customer_phonenumber: customerPhoneNumber,
+          note: form.specialRequests.trim() || null,
           from_date: form.checkIn,
           to_date: form.checkOut,
-          voucher_code: null,
+          total_price: total,
+          voucher_code: payment.method === "bank_transfer" ? "BANKPAY" : null,
         }),
       });
 
@@ -259,8 +382,9 @@ const BookingPage = () => {
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-3">{t("booking.successTitle")}</h2>
           <p className="text-slate-500 mb-2">{t("booking.successDesc")}</p>
+          <p className="text-sm text-slate-400 mb-2">{t("booking.successQueueNotice")}</p>
           <p className="text-sm text-slate-400 mb-8">
-            {t("booking.bookingCode")}: <span className="font-semibold text-slate-700">{successBooking.booking_id}</span>
+            {t("booking.bookingCode")}: <span className="font-semibold text-slate-700">{successBooking.booking_code || successBooking.booking_id}</span>
           </p>
           <Link
             to="/"
@@ -303,130 +427,351 @@ const BookingPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
               {!isLoggedIn && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="bg-sky-50 border border-sky-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
-                    <p className="font-semibold text-amber-900">{t("booking.loginRequired")}</p>
-                    <p className="text-sm text-amber-700 mt-1">{t("booking.loginHint")}</p>
+                    <p className="font-semibold text-sky-900">{t("booking.guestBookingTitle")}</p>
+                    <p className="text-sm text-sky-700 mt-1">{t("booking.guestBookingHint")}</p>
                   </div>
                   <Link
                     to="/login"
-                    className="inline-flex items-center justify-center rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 transition-colors"
+                    className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 transition-colors"
                   >
                     {t("booking.loginNow")}
                   </Link>
                 </div>
               )}
 
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
-                <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                  <CalendarCheck className="w-5 h-5 text-(--main)" />
-                  {t("booking.stayInfo")}
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.checkIn")}</label>
-                    <input
-                      type="date"
-                      name="checkIn"
-                      min={today()}
-                      value={form.checkIn}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.checkOut")}</label>
-                    <input
-                      type="date"
-                      name="checkOut"
-                      min={form.checkIn || today()}
-                      value={form.checkOut}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5" /> {t("booking.guests")}
-                    </label>
-                    <input
-                      type="number"
-                      name="guests"
-                      min={1}
-                      max={selectedRoom.people_number || 1}
-                      value={form.guests}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
-                    />
-                  </div>
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {BOOKING_STEPS.map((stepKey, index) => {
+                    const stepNumber = index + 1;
+                    const isActive = currentStep === stepNumber;
+                    const isCompleted = currentStep > stepNumber;
+
+                    return (
+                      <div
+                        key={stepKey}
+                        className={`rounded-2xl border px-4 py-4 transition-all ${isActive ? "border-(--main) bg-emerald-50" : isCompleted ? "border-emerald-200 bg-emerald-50/60" : "border-gray-200 bg-white"}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${isActive || isCompleted ? "bg-(--main) text-white" : "bg-slate-100 text-slate-500"}`}>
+                            {stepNumber}
+                          </div>
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{t("booking.stepLabel")}</p>
+                            <p className="text-sm font-semibold text-slate-800">{t(`booking.steps.${stepKey}`)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                {nights <= 0 && (
-                  <p className="mt-3 text-sm text-red-500">{t("booking.invalidDateRange")}</p>
-                )}
-                {guestLimitExceeded && (
-                  <p className="mt-3 text-sm text-red-500">{t("booking.exceedCapacity")}</p>
-                )}
               </div>
 
-              <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
-                <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-(--main)" />
-                  {t("booking.guestInfo")}
-                </h2>
-                {profileLoading && (
-                  <div className="mb-4 flex items-center gap-2 text-sm text-slate-400">
-                    <Loader2 className="w-4 h-4 animate-spin" /> {t("booking.prefillLoading")}
-                  </div>
-                )}
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.guestName")}</label>
-                      <input
-                        type="text"
-                        name="name"
-                        required
-                        value={form.name}
-                        onChange={handleChange}
-                        placeholder={t("booking.guestNamePlaceholder")}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
-                      />
+              {currentStep === 1 && (
+                <>
+                  <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+                    <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                      <CalendarCheck className="w-5 h-5 text-(--main)" />
+                      {t("booking.stayInfo")}
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.checkIn")}</label>
+                        <input
+                          type="date"
+                          name="checkIn"
+                          min={today()}
+                          value={form.checkIn}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.checkOut")}</label>
+                        <input
+                          type="date"
+                          name="checkOut"
+                          min={form.checkIn || today()}
+                          value={form.checkOut}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5" /> {t("booking.guests")}
+                        </label>
+                        <input
+                          type="number"
+                          name="guests"
+                          min={1}
+                          max={selectedRoom.people_number || 1}
+                          value={form.guests}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.guestEmail")}</label>
-                      <input
-                        type="email"
-                        name="email"
-                        required
-                        value={form.email}
-                        onChange={handleChange}
-                        placeholder={t("booking.guestEmailPlaceholder")}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
-                      />
+                    {nights <= 0 && (
+                      <p className="mt-3 text-sm text-red-500">{t("booking.invalidDateRange")}</p>
+                    )}
+                    {guestLimitExceeded && (
+                      <p className="mt-3 text-sm text-red-500">{t("booking.exceedCapacity")}</p>
+                    )}
+                  </div>
+
+                  <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+                    <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-(--main)" />
+                      {t("booking.guestInfo")}
+                    </h2>
+                    {profileLoading && (
+                      <div className="mb-4 flex items-center gap-2 text-sm text-slate-400">
+                        <Loader2 className="w-4 h-4 animate-spin" /> {t("booking.prefillLoading")}
+                      </div>
+                    )}
+                    <div className="space-y-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.guestName")}</label>
+                          <input
+                            type="text"
+                            name="name"
+                            required
+                            value={form.name}
+                            onChange={handleChange}
+                            placeholder={t("booking.guestNamePlaceholder")}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.guestEmail")}</label>
+                          <input
+                            type="email"
+                            name="email"
+                            required
+                            value={form.email}
+                            onChange={handleChange}
+                            placeholder={t("booking.guestEmailPlaceholder")}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.guestPhone")}</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-[220px_minmax(0,1fr)] gap-3">
+                          <select
+                            name="countryCode"
+                            value={form.countryCode}
+                            onChange={handleChange}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                          >
+                            {countries.map((country) => (
+                              <option key={country.code} value={country.code}>
+                                {country.flag} {getCountryName(country, lang)} ({country.dial_code})
+                              </option>
+                            ))}
+                          </select>
+
+                          <div className="flex items-center rounded-xl border border-gray-200 focus-within:border-(--main) focus-within:ring-2 focus-within:ring-(--main)/20 overflow-hidden bg-white">
+                            <div className="shrink-0 px-4 py-2.5 bg-slate-50 border-r border-gray-200 text-sm font-semibold text-slate-600">
+                              {selectedCountry?.dial_code}
+                            </div>
+                            <input
+                              type="tel"
+                              name="phone"
+                              required
+                              value={form.phone}
+                              onChange={handleChange}
+                              inputMode="numeric"
+                              maxLength={maxPhoneDigits}
+                              placeholder={t("booking.guestPhonePlaceholder")}
+                              className="w-full px-4 py-2.5 text-sm focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">
+                          {t("booking.guestPhonePreview")}: <span className="font-semibold text-slate-700">{guestPhoneFull}</span>
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.specialRequests")}</label>
+                        <textarea
+                          name="specialRequests"
+                          rows={3}
+                          value={form.specialRequests}
+                          onChange={handleChange}
+                          placeholder={t("booking.specialRequestsPlaceholder")}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20 resize-none"
+                        />
+                      </div>
+
+                      {submitError && (
+                        <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                          <AlertCircle className="w-4 h-4" /> {submitError}
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={goToPaymentStep}
+                        disabled={nights <= 0 || guestLimitExceeded || !selectedRoom.room_id}
+                        className="w-full flex items-center justify-center gap-2 bg-(--main) hover:bg-[#52DBA9] disabled:opacity-60 text-white py-3.5 rounded-full font-semibold transition-all shadow-lg shadow-(--main)/20 active:scale-95"
+                      >
+                        {t("booking.continueToPayment")}
+                      </button>
                     </div>
                   </div>
+                </>
+              )}
+
+              {currentStep === 2 && (
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 space-y-6">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.guestPhone")}</label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      required
-                      value={form.phone}
-                      onChange={handleChange}
-                      placeholder={t("booking.guestPhonePlaceholder")}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
-                    />
+                    <h2 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
+                      <Wallet className="w-5 h-5 text-(--main)" />
+                      {t("booking.paymentMethod")}
+                    </h2>
+                    <p className="text-sm text-slate-500">{t("booking.paymentHint")}</p>
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {PAYMENT_METHODS.map((method) => {
+                      const Icon = method.icon;
+                      const selected = payment.method === method.key;
+                      return (
+                        <button
+                          key={method.key}
+                          type="button"
+                          onClick={() => setPayment((prev) => ({ ...prev, method: method.key }))}
+                          className={`rounded-2xl border p-5 text-left transition-all ${selected ? "border-(--main) bg-emerald-50 shadow-sm" : "border-gray-200 hover:border-emerald-200 hover:bg-slate-50"}`}
+                        >
+                          <div className="w-11 h-11 rounded-2xl bg-white border border-gray-100 flex items-center justify-center mb-4">
+                            <Icon className="w-5 h-5 text-(--main)" />
+                          </div>
+                          <p className="font-semibold text-slate-800 mb-1">{t(`booking.paymentMethods.${method.key}.label`)}</p>
+                          <p className="text-sm text-slate-500">{t(`booking.paymentMethods.${method.key}.description`)}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {payment.method === "bank_transfer" && (
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 space-y-2">
+                      <p className="font-semibold text-slate-800">{t("booking.bankTransferTitle")}</p>
+                      <p className="text-sm text-slate-600">{t("booking.bankTransferBank")}: Aurora Hotel Bank</p>
+                      <p className="text-sm text-slate-600">{t("booking.bankTransferAccount")}: 1900 2026 8888</p>
+                      <p className="text-sm text-slate-600">{t("booking.bankTransferOwner")}: AURORA HOSPITALITY GROUP</p>
+                      <p className="text-sm text-slate-500">{t("booking.bankTransferNote")}</p>
+                    </div>
+                  )}
+
+                  {payment.method === "credit_card" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.cardHolder")}</label>
+                        <input
+                          type="text"
+                          value={payment.cardHolder}
+                          onChange={(e) => setPayment((prev) => ({ ...prev, cardHolder: e.target.value }))}
+                          placeholder={t("booking.cardHolderPlaceholder")}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.cardNumber")}</label>
+                        <input
+                          type="text"
+                          value={payment.cardNumber}
+                          onChange={(e) => setPayment((prev) => ({ ...prev, cardNumber: normalizePhoneNumber(e.target.value).slice(0, 16) }))}
+                          placeholder={t("booking.cardNumberPlaceholder")}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.expiryDate")}</label>
+                        <input
+                          type="text"
+                          value={payment.expiryDate}
+                          onChange={(e) => setPayment((prev) => ({ ...prev, expiryDate: e.target.value }))}
+                          placeholder={t("booking.expiryDatePlaceholder")}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {payment.method === "pay_at_hotel" && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+                      {t("booking.payAtHotelNote")}
+                    </div>
+                  )}
+
+                  {submitError && (
+                    <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                      <AlertCircle className="w-4 h-4" /> {submitError}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className="sm:flex-1 border border-gray-200 text-slate-700 py-3.5 rounded-full font-semibold hover:bg-slate-50 transition-colors"
+                    >
+                      {t("booking.backToDetails")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goToConfirmationStep}
+                      className="sm:flex-1 bg-(--main) hover:bg-[#52DBA9] text-white py-3.5 rounded-full font-semibold transition-all shadow-lg shadow-(--main)/20"
+                    >
+                      {t("booking.continueToConfirmation")}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {currentStep === 3 && (
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 space-y-6">
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">{t("booking.specialRequests")}</label>
-                    <textarea
-                      name="specialRequests"
-                      rows={3}
-                      value={form.specialRequests}
-                      onChange={handleChange}
-                      placeholder={t("booking.specialRequestsPlaceholder")}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-(--main) focus:ring-2 focus:ring-(--main)/20 resize-none"
-                    />
+                    <h2 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
+                      <BadgeCheck className="w-5 h-5 text-(--main)" />
+                      {t("booking.confirmationTitle")}
+                    </h2>
+                    <p className="text-sm text-slate-500">{t("booking.confirmationHint")}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="rounded-2xl border border-gray-100 bg-slate-50 p-5">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400 mb-3">{t("booking.reviewGuestInfo")}</p>
+                      <div className="space-y-2 text-sm text-slate-600">
+                        <p><span className="font-semibold text-slate-800">{t("booking.guestName")}: </span>{form.name}</p>
+                        <p><span className="font-semibold text-slate-800">{t("booking.guestEmail")}: </span>{form.email}</p>
+                        <p><span className="font-semibold text-slate-800">{t("booking.guestPhone")}: </span>{guestPhoneFull}</p>
+                        {form.specialRequests && <p><span className="font-semibold text-slate-800">{t("booking.specialRequests")}: </span>{form.specialRequests}</p>}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-100 bg-slate-50 p-5">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400 mb-3">{t("booking.reviewPayment")}</p>
+                      <div className="space-y-2 text-sm text-slate-600">
+                        <p><span className="font-semibold text-slate-800">{t("booking.paymentMethod")}: </span>{t(`booking.paymentMethods.${payment.method}.label`)}</p>
+                        {payment.method === "credit_card" && (
+                          <>
+                            <p><span className="font-semibold text-slate-800">{t("booking.cardHolder")}: </span>{payment.cardHolder}</p>
+                            <p><span className="font-semibold text-slate-800">{t("booking.cardNumber")}: </span>•••• •••• •••• {payment.cardNumber.slice(-4)}</p>
+                          </>
+                        )}
+                        {payment.method === "bank_transfer" && <p>{t("booking.bankTransferSummary")}</p>}
+                        {payment.method === "pay_at_hotel" && <p>{t("booking.payAtHotelSummary")}</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4 text-sm text-slate-700">
+                    {t("booking.finalNotice")}
                   </div>
 
                   {submitError && (
@@ -435,16 +780,26 @@ const BookingPage = () => {
                     </div>
                   )}
 
-                  <button
-                    type="submit"
-                    disabled={submitting || nights <= 0 || guestLimitExceeded || !selectedRoom.room_id || !isLoggedIn}
-                    className="w-full flex items-center justify-center gap-2 bg-(--main) hover:bg-[#52DBA9] disabled:opacity-60 text-white py-3.5 rounded-full font-semibold transition-all shadow-lg shadow-(--main)/20 active:scale-95"
-                  >
-                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {submitting ? t("booking.processing") : t("booking.confirm")}
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="sm:flex-1 border border-gray-200 text-slate-700 py-3.5 rounded-full font-semibold hover:bg-slate-50 transition-colors"
+                    >
+                      {t("booking.backToPayment")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={submitting}
+                      className="sm:flex-1 flex items-center justify-center gap-2 bg-(--main) hover:bg-[#52DBA9] disabled:opacity-60 text-white py-3.5 rounded-full font-semibold transition-all shadow-lg shadow-(--main)/20 active:scale-95"
+                    >
+                      {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {submitting ? t("booking.processing") : t("booking.placeBooking")}
+                    </button>
+                  </div>
                 </div>
-              </form>
+              )}
             </div>
 
             <div className="lg:col-span-1">
@@ -527,6 +882,13 @@ const BookingPage = () => {
                 </div>
 
                 <div className="border-t border-gray-100 pt-5">
+                  <div className="mb-4 rounded-2xl bg-slate-50 px-4 py-3 border border-slate-100">
+                    <p className="text-xs text-slate-400 mb-1">{t("booking.currentStep")}</p>
+                    <p className="font-semibold text-slate-800">{t(`booking.steps.${BOOKING_STEPS[currentStep - 1]}`)}</p>
+                    {selectedPaymentMethod && currentStep >= 2 && (
+                      <p className="text-xs text-slate-500 mt-1">{t(`booking.paymentMethods.${selectedPaymentMethod.key}.label`)}</p>
+                    )}
+                  </div>
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-sm text-slate-500">{t("booking.totalPrice")}</p>
