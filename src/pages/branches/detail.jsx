@@ -139,7 +139,7 @@ const BranchDetailPage = () => {
                     <p className="text-xl font-bold text-(--main)">{formatPrice(room.price)}</p>
                   </div>
                   <Link
-                    to={`/booking?branchId=${branch.branch_id}&roomId=${room.room_id}`}
+                    to={`/booking?branchId=${branch.branch_code}&roomId=${room.room_id}`}
                     className="bg-(--main) hover:bg-[#52DBA9] text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors"
                   >
                     {t("rooms.bookNow")}

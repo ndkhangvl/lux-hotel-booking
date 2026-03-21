@@ -187,7 +187,7 @@ const RoomDialog = ({ open, mode, initialData, branchId, onClose, onSuccess }) =
         price: form.price !== "" ? Number(form.price) : null,
         people_number: form.people_number !== "" ? Number(form.people_number) : 1,
         del_flg: Number(form.del_flg),
-        branch_id: branchId,
+        branch_code: branchId,
         amenity_ids: form.amenity_ids,
       };
       if (mode === "update" && initialData?.room_id) {
@@ -395,7 +395,7 @@ const BranchRoomDialog = ({ open, mode, initialData, branchId, roomOptions, onCl
     setError(null);
     try {
       const body = {
-        branch_id: branchId,
+        branch_code: branchId,
         room_id: form.room_id,
         room_number: form.room_number.trim(),
         del_flg: Number(form.del_flg),
@@ -554,7 +554,7 @@ const AdminBranchRooms = () => {
     setStatsLoading(true);
     setStatsError(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/rooms/initialize?branch_id=${branchId}`);
+      const res = await fetch(`${API_BASE}/admin/rooms/initialize?branch_code=${branchId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setStats(data);
@@ -570,7 +570,7 @@ const AdminBranchRooms = () => {
     setTableError(null);
     try {
       const res = await fetch(
-        `${API_BASE}/admin/rooms/rooms-list?branch_id=${branchId}&page=${currentPage}&page_size=${currentPageSize}`
+        `${API_BASE}/admin/rooms/rooms-list?branch_code=${branchId}&page=${currentPage}&page_size=${currentPageSize}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -591,7 +591,7 @@ const AdminBranchRooms = () => {
     setBranchRoomsError(null);
     try {
       const res = await fetch(
-        `${API_BASE}/admin/rooms/branch-rooms-list?branch_id=${branchId}&page=${currentPage}&page_size=${currentPageSize}`
+        `${API_BASE}/admin/rooms/branch-rooms-list?branch_code=${branchId}&page=${currentPage}&page_size=${currentPageSize}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -653,7 +653,7 @@ const AdminBranchRooms = () => {
     setBranchRoomDeleteLoading(true);
     setBranchRoomDeleteError(null);
     try {
-      const res = await fetch(`${API_BASE}/admin/rooms/branch-rooms?branch_id=${branchId}`, {
+      const res = await fetch(`${API_BASE}/admin/rooms/branch-rooms?branch_code=${branchId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ branch_room_id: String(branchRoomDeleteTarget.branch_room_id) }),

@@ -71,7 +71,7 @@ const Branches = () => {
           {!loading &&
             branches.map((branch, idx) => (
             <div
-              key={branch.branch_id}
+              key={branch.branch_code}
               className="group relative rounded-2xl overflow-hidden h-80 cursor-pointer shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
             >
               <img
@@ -101,7 +101,7 @@ const Branches = () => {
                     <span className="text-white/80">{branch.total_rooms || 0} {t("home.branches.rooms")}</span>
                   </div>
                   <Link
-                    to={`/branches/${branch.branch_id}`}
+                    to={`/branches/${branch.branch_code}`}
                     className="flex items-center gap-1 text-(--main) text-sm font-semibold hover:text-white transition-colors"
                   >
                     {t("home.branches.viewDetail")} <ArrowRight className="w-3.5 h-3.5" />
