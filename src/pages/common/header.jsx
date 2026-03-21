@@ -8,15 +8,13 @@ import {
 } from "@/components/ui/dialog";
 import { HotelShareIcon } from "@/utils/share_icon";
 import { ACCESS_TOKEN } from "@/utils/constant";
-import { ArrowRight, Eye, EyeOff, Facebook, LogOut, Search } from "lucide-react";
+import { Eye, EyeOff, Facebook, LogOut, Search, ChevronDown, MapPin } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import API_BASE from "@/utils/api";
 import axios from "axios";
 
 const NAV_LINKS = [
-  { key: "home", path: "/" },
-  { key: "rooms", path: "/rooms" },
   { key: "services", path: "/services" },
   { key: "blog", path: "/blog" },
   { key: "contact", path: "/contact" },
@@ -70,6 +68,8 @@ const Header = () => {
       role: payload?.role ?? null,
     };
   });
+  const [branches, setBranches] = useState([]);
+  const [branchesLoading, setBranchesLoading] = useState(true);
   const location = useLocation();
   const { t, lang, switchLang } = useLanguage();
   const navigate = useNavigate();
@@ -88,6 +88,24 @@ const Header = () => {
     window.addEventListener("storage", syncAuthState);
     return () => window.removeEventListener("storage", syncAuthState);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const fetchBranches = async () => {
+      setBranchesLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/user/branches/branches-list?page=1&page_size=8`);
+        if (!res.ok) throw new Error("Failed to fetch branches");
+        const data = await res.json();
+        setBranches(Array.isArray(data?.items) ? data.items : []);
+      } catch {
+        setBranches([]);
+      } finally {
+        setBranchesLoading(false);
+      }
+    };
+
+    fetchBranches();
+  }, []);
 
   const isActive = (path) =>
     path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
@@ -256,6 +274,66 @@ const Header = () => {
 
             {/* Desktop Nav */}
             <nav className="hidden lg:flex items-center gap-8">
+              <Link
+                to="/"
+                className={`text-sm font-semibold ${navClass("/")} transition-colors`}
+              >
+                {t("nav.home")}
+              </Link>
+
+              <div className="relative group">
+                <Link
+                  to="/branches"
+                  className={`inline-flex items-center gap-1 text-sm font-semibold ${navClass("/branches")} transition-colors`}
+                >
+                  {t("nav.rooms")} <ChevronDown className="w-4 h-4" />
+                </Link>
+
+                <div className="invisible opacity-0 translate-y-2 pointer-events-none group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 absolute top-full left-0 pt-4 z-50">
+                  <div className="w-80 rounded-2xl border border-gray-100 bg-white shadow-2xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 bg-slate-50">
+                      <p className="text-sm font-bold text-slate-800">{t("nav.rooms")}</p>
+                    </div>
+                    <div className="p-2">
+                      {branchesLoading && (
+                        <div className="space-y-2 p-2">
+                          {Array.from({ length: 4 }).map((_, idx) => (
+                            <div key={idx} className="h-12 rounded-xl bg-slate-100 animate-pulse" />
+                          ))}
+                        </div>
+                      )}
+
+                      {!branchesLoading && branches.length > 0 && branches.map((branch) => (
+                        <Link
+                          key={branch.branch_id}
+                          to={`/branches/${branch.branch_id}`}
+                          className="flex items-start gap-3 rounded-xl px-3 py-3 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="w-9 h-9 rounded-xl bg-[#ECFDF5] text-(--main) flex items-center justify-center shrink-0">
+                            <MapPin className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-800 line-clamp-1">{branch.name}</p>
+                            <p className="text-xs text-slate-500 line-clamp-2">{branch.address}</p>
+                          </div>
+                        </Link>
+                      ))}
+
+                      {!branchesLoading && branches.length === 0 && (
+                        <div className="px-3 py-6 text-sm text-slate-500 text-center">
+                          {t("common.noData")}
+                        </div>
+                      )}
+                    </div>
+                    <div className="px-4 py-3 border-t border-gray-100 bg-slate-50">
+                      <Link to="/branches" className="text-sm font-semibold text-(--main) hover:underline">
+                        {t("home.branches.viewAll")}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {NAV_LINKS.map(({ key, path }) => (
                 <Link
                   key={key}
@@ -282,12 +360,6 @@ const Header = () => {
                 />
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
               </div>
-              <Link
-                to="/booking"
-                className="hidden sm:flex items-center gap-2 bg-(--main) hover:bg-[#52DBA9] text-white px-6 py-2.5 rounded-full font-semibold text-sm transition-all shadow-lg shadow-blue-200 active:scale-95"
-              >
-                {t("nav.bookNow")} <ArrowRight className="w-4 h-4" />
-              </Link>
               {authState.isLoggedIn ? (
                 <button
                   type="button"
@@ -346,25 +418,47 @@ const Header = () => {
             mobileOpen ? "" : "hidden"
           } lg:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 p-4 space-y-4 shadow-xl animate-in slide-in-from-top duration-300`}
         >
+          <Link
+            to="/"
+            onClick={() => setMobileOpen(false)}
+            className={`block py-2 ${isActive("/") ? "text-(--main)" : "text-gray-600"} font-semibold`}
+          >
+            {t("nav.home")}
+          </Link>
+
+          <Link
+            to="/branches"
+            onClick={() => setMobileOpen(false)}
+            className={`block py-2 border-t border-gray-50 pt-4 ${isActive("/branches") ? "text-(--main)" : "text-gray-600"} font-semibold`}
+          >
+            {t("nav.rooms")}
+          </Link>
+
+          {!branchesLoading && branches.length > 0 && (
+            <div className="space-y-2 pl-4 border-l-2 border-slate-100">
+              {branches.slice(0, 5).map((branch) => (
+                <Link
+                  key={branch.branch_id}
+                  to={`/branches/${branch.branch_id}`}
+                  onClick={() => setMobileOpen(false)}
+                  className="block py-2 text-sm text-slate-500 hover:text-(--main)"
+                >
+                  {branch.name}
+                </Link>
+              ))}
+            </div>
+          )}
+
           {NAV_LINKS.map(({ key, path }, i) => (
             <Link
               key={key}
               to={path}
               onClick={() => setMobileOpen(false)}
-              className={`block py-2 ${isActive(path) ? "text-(--main)" : "text-gray-600"} font-semibold ${i > 0 ? "border-t border-gray-50 pt-4" : ""}`}
+              className={`block py-2 ${isActive(path) ? "text-(--main)" : "text-gray-600"} font-semibold border-t border-gray-50 pt-4`}
             >
               {t(`nav.${key}`)}
             </Link>
           ))}
-          <div className="pt-4 border-t border-gray-50 flex items-center justify-center">
-            <Link
-              to="/booking"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center justify-center gap-2 bg-(--main) text-white py-3 rounded-xl font-semibold w-full text-center"
-            >
-              {t("nav.bookNow")}
-            </Link>
-          </div>
           <div className="flex items-center justify-center pt-2">
             {authState.isLoggedIn ? (
               <button
