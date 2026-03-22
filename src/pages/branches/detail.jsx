@@ -138,12 +138,20 @@ const BranchDetailPage = () => {
                     <p className="text-xs text-slate-400">{t("booking.roomPrice")}</p>
                     <p className="text-xl font-bold text-(--main)">{formatPrice(room.price)}</p>
                   </div>
-                  <Link
-                    to={`/booking?branchId=${branch.branch_code}&roomId=${room.room_id}`}
-                    className="bg-(--main) hover:bg-[#52DBA9] text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors"
-                  >
-                    {t("rooms.bookNow")}
-                  </Link>
+                  <div className="flex gap-2">
+                    <Link
+                      to={`/rooms/${room.room_id}`}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-full transition-colors"
+                    >
+                      {"Chi tiết"}
+                    </Link>
+                    <Link
+                      to={`/booking?branchId=${branch.branch_code}&roomId=${room.room_id}`}
+                      className="bg-(--main) hover:bg-[#52DBA9] text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors"
+                    >
+                      {t("rooms.bookNow")}
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>

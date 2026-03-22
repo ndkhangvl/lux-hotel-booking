@@ -238,12 +238,20 @@ const RoomsPage = () => {
                       <span className="text-lg font-bold text-(--main)">{formatPrice(room.price)}</span>
                       <span className="text-slate-400 text-xs ml-1">{t("rooms.perNight")}</span>
                     </div>
-                    <Link
-                      to={`/booking?room=${room.id}`}
-                      className="bg-(--main) hover:bg-[#52DBA9] text-white text-xs font-semibold px-4 py-2 rounded-full transition-colors"
-                    >
-                      {t("rooms.bookNow")}
-                    </Link>
+                    <div className="flex gap-2">
+                      <Link
+                        to={`/rooms/${room.id}`}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-4 py-2 rounded-full transition-colors"
+                      >
+                        {t("Chi tiết")}
+                      </Link>
+                      <Link
+                        to={`/booking?room=${room.id}`}
+                        className="bg-(--main) hover:bg-[#52DBA9] text-white text-xs font-semibold px-4 py-2 rounded-full transition-colors"
+                      >
+                        {t("rooms.bookNow")}
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -16,10 +16,12 @@ import Home from "./pages/home";
 import BranchesPage from "./pages/branches-page";
 import BranchDetailPage from "./pages/branches/detail";
 import RoomsPage from "./pages/rooms/index";
+import RoomDetailPage from "./pages/rooms/detail";
 import ServicesPage from "./pages/services/index";
 import BlogPage from "./pages/blog/index";
 import ContactPage from "./pages/contact/index";
 import BookingPage from "./pages/booking/index";
+import { UserBookingsPage } from "./pages/user/bookings";
 import AdminLayout from "./pages/admin/layout/AdminLayout";
 import AdminDashboard from "./pages/admin/dashboard/index";
 import AdminAccounts from "./pages/admin/accounts/index";
@@ -108,6 +110,10 @@ const router = createBrowserRouter([
         element: <RoomsPage />,
       },
       {
+        path: "rooms/:roomId",
+        element: <RoomDetailPage />,
+      },
+      {
         path: "branches",
         element: <BranchesPage />,
       },
@@ -130,6 +136,10 @@ const router = createBrowserRouter([
       {
         path: "booking",
         element: <BookingPage />,
+      },
+      {
+        path: "my-bookings",
+        element: <UserBookingsPage />,
       },
       {
         path: "login",

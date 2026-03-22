@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { HotelShareIcon } from "@/utils/share_icon";
 import { ACCESS_TOKEN } from "@/utils/constant";
-import { Eye, EyeOff, Facebook, LogOut, Search, ChevronDown, MapPin } from "lucide-react";
+import { Eye, EyeOff, Facebook, LogOut, Search, ChevronDown, MapPin, UserCircle, History } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import API_BASE from "@/utils/api";
@@ -361,14 +361,21 @@ const Header = () => {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
               </div>
               {authState.isLoggedIn ? (
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="hidden sm:flex items-center gap-2 border border-gray-200 hover:border-red-300 text-slate-700 hover:text-red-500 px-5 py-2.5 rounded-full font-semibold text-sm transition-all"
-                >
-                  <LogOut className="w-4 h-4" />
-                  {t("admin.header.logout")}
-                </button>
+                <div className="hidden sm:block relative group">
+                  <button className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200 hover:bg-emerald-200 transition-colors">
+                    <UserCircle className="w-6 h-6" />
+                  </button>
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
+                    <div className="py-2">
+                       <Link to="/my-bookings" className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                         <History className="w-4 h-4" /> Lịch sử đặt phòng
+                       </Link>
+                       <button onClick={handleLogout} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors font-semibold border-t border-gray-100 mt-1 pt-3">
+                         <LogOut className="w-4 h-4" /> Đăng xuất
+                       </button>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <button
                   type="button"
@@ -461,17 +468,22 @@ const Header = () => {
           ))}
           <div className="flex items-center justify-center pt-2">
             {authState.isLoggedIn ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileOpen(false);
-                  handleLogout();
-                }}
-                className="w-full border border-gray-200 hover:border-red-300 text-slate-700 hover:text-red-500 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                {t("admin.header.logout")}
-              </button>
+              <div className="w-full space-y-3">
+                 <Link to="/my-bookings" onClick={() => setMobileOpen(false)} className="w-full border border-gray-200 hover:border-emerald-300 text-slate-700 hover:text-emerald-500 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2">
+                   <History className="w-4 h-4" /> Lịch sử đặt phòng
+                 </Link>
+                 <button
+                   type="button"
+                   onClick={() => {
+                     setMobileOpen(false);
+                     handleLogout();
+                   }}
+                   className="w-full border border-gray-200 hover:border-red-300 text-slate-700 hover:text-red-500 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
+                 >
+                   <LogOut className="w-4 h-4" />
+                   {t("admin.header.logout")}
+                 </button>
+              </div>
             ) : (
               <button
                 type="button"
