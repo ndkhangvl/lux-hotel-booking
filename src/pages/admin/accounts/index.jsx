@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search,
   Plus,
@@ -92,35 +92,64 @@ const AdminAccounts = () => {
   });
   const [deleteId, setDeleteId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalAccounts, setTotalAccounts] = useState(0);
 
-  // Fetch users using FastAPI /users/, with Authorization header if present
-  useEffect(() => {
-    const fetchAccounts = async () => {
-      setLoading(true);
-      try {
-        const token = getToken();
-        const res = await fetch(API_BASE + "/users", {
-          headers: token
-            ? { Authorization: `Bearer ${token}` }
-            : {},
-        });
-        if (!res.ok) throw new Error("Failed to fetch users");
-        const data = await res.json();
-        setAccounts(
-          data.map((a) => ({
-            ...a,
-            created_date: a.created_date ? a.created_date : "",
-            created_time: a.created_time ? a.created_time : "",
-          }))
-        );
-      } catch (err) {
-        setAccounts([]);
-      } finally {
-        setLoading(false);
+  const fetchAccounts = async (pageNum, isLoadMore = false) => {
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/users?page=${pageNum}&page_size=128`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      const data = await res.json();
+      
+      const newItems = data.items.map((a) => ({
+        ...a,
+        created_date: a.created_date || "",
+        created_time: a.created_time || "",
+      }));
+
+      if (isLoadMore) {
+        setAccounts(prev => [...prev, ...newItems]);
+      } else {
+        setAccounts(newItems);
+        setTotalAccounts(data.total);
       }
-    };
-    fetchAccounts();
+      setHasMore(data.items.length === 128); // if full page received, might have more
+    } catch (err) {
+      if (!isLoadMore) setAccounts([]);
+    } finally {
+      if (pageNum === 1) setLoading(false);
+      else setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAccounts(1, false);
   }, []);
+
+  useEffect(() => {
+    if (page > 1) {
+      fetchAccounts(page, true);
+    }
+  }, [page]);
+
+  const observer = useRef();
+  const lastAccountElementRef = useCallback(node => {
+    if (loading || loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prevPage => prevPage + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, loadingMore, hasMore]);
 
   // Filter active users by search/role
   const filtered = accounts.filter((a) => {
@@ -240,9 +269,9 @@ const AdminAccounts = () => {
   // Gọi deleted thay vì handleDelete tại các chỗ xác nhận xóa
   // User statistics
   const totals = {
-    all: accounts.filter((a) => a.del_flg === 0).length,
-    active: accounts.filter((a) => a.del_flg === 0).length,
-    inactive: accounts.filter((a) => a.del_flg === 1).length,
+    all: totalAccounts,
+    active: totalAccounts,
+    inactive: 0,
   };
 
   return (
@@ -340,10 +369,13 @@ const AdminAccounts = () => {
                   <td colSpan={8} className="py-10 text-center text-sm text-gray-400">{t("common.noData")}</td>
                 </tr>
               ) : (
-                filtered.map(a => {
+                filtered.map((a, index) => {
                   const rCfg = roleColors[a.role] || roleColors.Customer;
+                  
+                  const isLastElement = filtered.length === index + 1;
+                  
                   return (
-                    <tr key={a.user_id} className="hover:bg-gray-50/60 transition-colors">
+                    <tr ref={isLastElement ? lastAccountElementRef : null} key={a.user_id} className="hover:bg-gray-50/60 transition-colors">
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
@@ -408,6 +440,11 @@ const AdminAccounts = () => {
                     </tr>
                   );
                 })
+              )}
+              {loadingMore && (
+                <tr>
+                  <td colSpan={8} className="py-4 text-center text-sm text-gray-400">Loading more...</td>
+                </tr>
               )}
             </tbody>
           </table>

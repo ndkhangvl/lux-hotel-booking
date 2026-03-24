@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import {
   AlertCircle,
   CalendarCheck,
@@ -123,28 +123,65 @@ const AdminBookings = () => {
   const [branches, setBranches] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalBookings, setTotalBookings] = useState(0);
 
-  const loadBookings = async () => {
-    setLoading(true);
+  const loadBookings = async (pageNum = 1, isLoadMore = false) => {
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE}/Admin/bookings/`);
+      const res = await fetch(`${API_BASE}/Admin/bookings/?page=${pageNum}&page_size=128`);
       if (!res.ok) throw new Error(t("booking.bookingFailed"));
       const data = await res.json();
-      setBookings(Array.isArray(data) ? data.map(mapBooking) : []);
+      const newItems = Array.isArray(data.items) ? data.items.map(mapBooking) : [];
+      
+      if (isLoadMore) {
+        setBookings(prev => [...prev, ...newItems]);
+      } else {
+        setBookings(newItems);
+        setTotalBookings(data.total || 0);
+      }
+      setHasMore(newItems.length === 128);
     } catch (fetchError) {
+      if (!isLoadMore) setBookings([]);
       setError(fetchError.message || t("booking.bookingFailed"));
     } finally {
-      setLoading(false);
+      if (pageNum === 1) setLoading(false);
+      else setLoadingMore(false);
     }
   };
 
+  useEffect(() => {
+    loadBookings(1, false);
+    loadBranches();
+  }, []);
+
+  useEffect(() => {
+    if (page > 1) {
+      loadBookings(page, true);
+    }
+  }, [page]);
+
+  const observer = useRef();
+  const lastBookingElementRef = useCallback(node => {
+    if (loading || loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prevPage => prevPage + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading, loadingMore, hasMore]);
   const loadBranches = async () => {
     try {
       const res = await fetch(`${API_BASE}/admin/branches/branches-list?page=1&page_size=100`);
@@ -173,11 +210,6 @@ const AdminBookings = () => {
   };
 
   useEffect(() => {
-    loadBookings();
-    loadBranches();
-  }, []);
-
-  useEffect(() => {
     if (!modalOpen || editItem) return;
     loadRooms(form.branch_code);
   }, [modalOpen, editItem, form.branch_code]);
@@ -191,7 +223,7 @@ const AdminBookings = () => {
 
   const today = new Date().toISOString().split("T")[0];
   const statCards = [
-    { label: t("admin.bookings.totalBookings"), value: bookings.length, icon: CalendarCheck, bg: "bg-blue-50", text: "text-blue-600" },
+    { label: t("admin.bookings.totalBookings"), value: totalBookings, icon: CalendarCheck, bg: "bg-blue-50", text: "text-blue-600" },
     { label: t("admin.bookings.pendingBookings"), value: bookings.filter((booking) => booking.status === "pending").length, icon: Clock, bg: "bg-amber-50", text: "text-amber-600" },
     { label: t("admin.bookings.todayCheckIn"), value: bookings.filter((booking) => booking.checkIn === today).length, icon: LogIn, bg: "bg-emerald-50", text: "text-emerald-600" },
     { label: t("admin.bookings.todayCheckOut"), value: bookings.filter((booking) => booking.checkOut === today).length, icon: LogOutIcon, bg: "bg-violet-50", text: "text-violet-600" },
@@ -377,11 +409,12 @@ const AdminBookings = () => {
                 <tr><td colSpan={10} className="py-10 text-center text-sm text-gray-400"><span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> {t("common.loading")}</span></td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={10} className="py-10 text-center text-sm text-gray-400">{t("common.noData")}</td></tr>
-              ) : filtered.map((booking) => {
+              ) : filtered.map((booking, index) => {
                 const statusStyle = statusConfig[booking.status] || statusConfig.pending;
                 const paymentStyle = paymentConfig[booking.paymentStatus] || paymentConfig.unpaid;
+                const isLastElement = filtered.length === index + 1;
                 return (
-                  <tr key={booking.bookingId} className="hover:bg-gray-50/60 transition-colors">
+                  <tr ref={isLastElement ? lastBookingElementRef : null} key={booking.bookingId} className="hover:bg-gray-50/60 transition-colors">
                     <td className="px-4 py-3.5 text-sm font-mono font-bold text-gray-800">{booking.bookingCode}</td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2">
@@ -408,6 +441,11 @@ const AdminBookings = () => {
                   </tr>
                 );
               })}
+              {loadingMore && (
+                <tr>
+                  <td colSpan={10} className="py-4 text-center text-sm text-gray-400">Loading more...</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

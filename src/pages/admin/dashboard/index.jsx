@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -10,57 +10,14 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/utils/LanguageContext";
 import { cn } from "@/lib/utils";
+import dashboardApi from "@/api/DashboardApi";
 
-const stats = [
-  {
-    key: "admin.dashboard.totalRevenue",
-    value: "₫ 1,248,500,000",
-    change: "+12.5%",
-    up: true,
-    icon: DollarSign,
-    color: "from-emerald-500 to-teal-400",
-    bg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
-  },
-  {
-    key: "admin.dashboard.totalBookings",
-    value: "3,842",
-    change: "+8.2%",
-    up: true,
-    icon: CalendarCheck,
-    color: "from-blue-500 to-cyan-400",
-    bg: "bg-blue-50",
-    iconColor: "text-blue-600",
-  },
-  {
-    key: "admin.dashboard.totalBranches",
-    value: "5",
-    change: "+1",
-    up: true,
-    icon: GitBranch,
-    color: "from-violet-500 to-purple-400",
-    bg: "bg-violet-50",
-    iconColor: "text-violet-600",
-  },
-  {
-    key: "admin.dashboard.totalAccounts",
-    value: "1,204",
-    change: "-2.1%",
-    up: false,
-    icon: Users,
-    color: "from-orange-500 to-amber-400",
-    bg: "bg-orange-50",
-    iconColor: "text-orange-600",
-  },
-];
-
-const recentBookings = [
-  { id: "#BK2401", guest: "Nguyễn Văn An", branch: "Cần Thơ", checkIn: "14/03/2026", checkOut: "16/03/2026", amount: "₫ 3,200,000", status: "confirmed" },
-  { id: "#BK2400", guest: "Trần Thị Bình", branch: "Hà Nội", checkIn: "13/03/2026", checkOut: "15/03/2026", amount: "₫ 5,600,000", status: "checkedIn" },
-  { id: "#BK2399", guest: "Lê Minh Châu", branch: "Đà Nẵng", checkIn: "12/03/2026", checkOut: "14/03/2026", amount: "₫ 4,100,000", status: "checkedOut" },
-  { id: "#BK2398", guest: "Phạm Quốc Dũng", branch: "TP.HCM", checkIn: "15/03/2026", checkOut: "17/03/2026", amount: "₫ 7,200,000", status: "pending" },
-  { id: "#BK2397", guest: "Hoàng Thu Hà", branch: "Vũng Tàu", checkIn: "10/03/2026", checkOut: "12/03/2026", amount: "₫ 2,900,000", status: "cancelled" },
-];
+const MAP_ICONS = {
+  "admin.dashboard.totalRevenue": { icon: DollarSign, color: "from-emerald-500 to-teal-400", bg: "bg-emerald-50", iconColor: "text-emerald-600" },
+  "admin.dashboard.totalBookings": { icon: CalendarCheck, color: "from-blue-500 to-cyan-400", bg: "bg-blue-50", iconColor: "text-blue-600" },
+  "admin.dashboard.totalBranches": { icon: GitBranch, color: "from-violet-500 to-purple-400", bg: "bg-violet-50", iconColor: "text-violet-600" },
+  "admin.dashboard.totalAccounts": { icon: Users, color: "from-orange-500 to-amber-400", bg: "bg-orange-50", iconColor: "text-orange-600" }
+};
 
 const statusConfig = {
   pending: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
@@ -70,16 +27,36 @@ const statusConfig = {
   cancelled: { bg: "bg-red-100", text: "text-red-700", dot: "bg-red-500" },
 };
 
-const topBranches = [
-  { name: "Aurora - Cần Thơ", revenue: "₫ 342M", bookings: 842, fill: 85 },
-  { name: "Aurora - TP.HCM", revenue: "₫ 421M", bookings: 1023, fill: 100 },
-  { name: "Aurora - Hà Nội", revenue: "₫ 287M", bookings: 670, fill: 68 },
-  { name: "Aurora - Đà Nẵng", revenue: "₫ 198M", bookings: 512, fill: 49 },
-  { name: "Aurora - Vũng Tàu", revenue: "₫ 145M", bookings: 380, fill: 36 },
-];
-
 const AdminDashboard = () => {
   const { t } = useLanguage();
+  const [stats, setStats] = useState([]);
+  const [recentBookings, setRecentBookings] = useState([]);
+  const [topBranches, setTopBranches] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await dashboardApi.getStats();
+        setStats(response?.stats || []);
+        setRecentBookings(response?.recentBookings || []);
+        setTopBranches(response?.topBranches || []);
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -91,24 +68,27 @@ const AdminDashboard = () => {
 
       {/* Stats grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {stats.map(({ key, value, change, up, icon: Icon, bg, iconColor }) => (
-          <div key={key} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between">
-              <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center", bg)}>
-                <Icon size={20} className={iconColor} />
+        {(stats || []).map(({ key, value, change, up }) => {
+          const { icon: Icon, bg, iconColor } = MAP_ICONS[key] || MAP_ICONS["admin.dashboard.totalBookings"];
+          return (
+            <div key={key} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between">
+                <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center", bg)}>
+                  <Icon size={20} className={iconColor} />
+                </div>
+                <span className={cn("flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full", up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600")}>
+                  {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                  {change}
+                </span>
               </div>
-              <span className={cn("flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full", up ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600")}>
-                {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                {change}
-              </span>
+              <div className="mt-4">
+                <p className="text-2xl font-bold text-gray-900">{value}</p>
+                <p className="text-sm text-gray-500 mt-0.5">{t(key)}</p>
+                <p className="text-xs text-gray-400 mt-1">{t("admin.dashboard.vsLastMonth")}</p>
+              </div>
             </div>
-            <div className="mt-4">
-              <p className="text-2xl font-bold text-gray-900">{value}</p>
-              <p className="text-sm text-gray-500 mt-0.5">{t(key)}</p>
-              <p className="text-xs text-gray-400 mt-1">{t("admin.dashboard.vsLastMonth")}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Bottom grid: Recent Bookings + Top Branches */}
@@ -134,7 +114,7 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {recentBookings.map((b) => {
+                {(recentBookings || []).map((b) => {
                   const cfg = statusConfig[b.status];
                   return (
                     <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
@@ -166,7 +146,7 @@ const AdminDashboard = () => {
             </button>
           </div>
           <div className="p-6 space-y-5">
-            {topBranches.map((b, i) => (
+            {(topBranches || []).map((b, i) => (
               <div key={i}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
