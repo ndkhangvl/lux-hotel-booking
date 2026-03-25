@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 import "./index.css";
 import { LanguageProvider } from "./utils/LanguageContext";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Login from "./pages/auth/login";
 import Header from "./pages/common/header";
 import Footer from "./pages/common/footer";
@@ -205,12 +206,16 @@ const router = createBrowserRouter([
   },
 ]);
 
+const queryClient = new QueryClient();
+
 function Main() {
   return (
     <React.StrictMode>
-      <LanguageProvider>
-        <RouterProvider router={router} />
-      </LanguageProvider>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          <RouterProvider router={router} />
+        </LanguageProvider>
+      </QueryClientProvider>
     </React.StrictMode>
   );
 }

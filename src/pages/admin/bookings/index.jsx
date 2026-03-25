@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   AlertCircle,
   CalendarCheck,
@@ -13,6 +13,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLanguage } from "@/utils/LanguageContext";
 import { cn } from "@/lib/utils";
 import API_BASE from "@/utils/api";
@@ -117,122 +119,116 @@ const getEditablePaymentStatus = (value) => (value === "paid" || value === "refu
 
 const AdminBookings = () => {
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [bookings, setBookings] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [error, setError] = useState("");
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [totalBookings, setTotalBookings] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
 
-  const loadBookings = async (pageNum = 1, isLoadMore = false) => {
-    if (pageNum === 1) setLoading(true);
-    else setLoadingMore(true);
-    setError("");
-    try {
-      const res = await fetch(`${API_BASE}/Admin/bookings/?page=${pageNum}&page_size=128`);
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 500); // 500ms debounce
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // 1. Bookings Query (Infinite)
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: bookingsLoading,
+  } = useInfiniteQuery({
+    queryKey: ["admin-bookings", debouncedSearch, statusFilter],
+    queryFn: async ({ pageParam = 1 }) => {
+      const params = new URLSearchParams({
+        page: pageParam,
+        page_size: 100,
+      });
+      if (debouncedSearch) params.append("search", debouncedSearch);
+      if (statusFilter !== "all") params.append("status", statusFilter);
+
+      const res = await fetch(`${API_BASE}/Admin/bookings/?${params.toString()}`);
       if (!res.ok) throw new Error(t("booking.bookingFailed"));
-      const data = await res.json();
-      const newItems = Array.isArray(data.items) ? data.items.map(mapBooking) : [];
-      
-      if (isLoadMore) {
-        setBookings(prev => [...prev, ...newItems]);
-      } else {
-        setBookings(newItems);
-        setTotalBookings(data.total || 0);
-      }
-      setHasMore(newItems.length === 128);
-    } catch (fetchError) {
-      if (!isLoadMore) setBookings([]);
-      setError(fetchError.message || t("booking.bookingFailed"));
-    } finally {
-      if (pageNum === 1) setLoading(false);
-      else setLoadingMore(false);
-    }
-  };
+      return res.json();
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.page < lastPage.total_pages) return lastPage.page + 1;
+      return undefined;
+    },
+    initialPageParam: 1,
+  });
 
-  useEffect(() => {
-    loadBookings(1, false);
-    loadBranches();
-  }, []);
+  const bookings = useMemo(() => {
+    return data?.pages.flatMap((page) => page.items.map(mapBooking)) || [];
+  }, [data]);
 
-  useEffect(() => {
-    if (page > 1) {
-      loadBookings(page, true);
-    }
-  }, [page]);
+  const totalBookings = data?.pages[0]?.total || 0;
 
-  const observer = useRef();
-  const lastBookingElementRef = useCallback(node => {
-    if (loading || loadingMore) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
-        setPage(prevPage => prevPage + 1);
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [loading, loadingMore, hasMore]);
-  const loadBranches = async () => {
-    try {
+  // 2. Branches Query
+  const { data: branchesRaw } = useInfiniteQuery({
+    queryKey: ["admin-branches"],
+    queryFn: async () => {
       const res = await fetch(`${API_BASE}/admin/branches/branches-list?page=1&page_size=100`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setBranches(Array.isArray(data?.items) ? data.items : []);
-    } catch {
-      setBranches([]);
-    }
-  };
+      return res.json();
+    },
+    initialPageParam: 1,
+    getNextPageParam: () => undefined,
+  });
+  const branches = branchesRaw?.pages[0]?.items || [];
 
-  const loadRooms = async (branchId) => {
-    if (!branchId) {
-      setRooms([]);
-      return;
-    }
+  // 3. Rooms Query
+  const { data: roomsRaw } = useInfiniteQuery({
+    queryKey: ["admin-rooms", form.branch_code],
+    queryFn: async () => {
+      if (!form.branch_code) return { items: [] };
+      const res = await fetch(`${API_BASE}/admin/rooms/rooms-list?branch_code=${form.branch_code}&page=1&page_size=100`);
+      return res.json();
+    },
+    enabled: modalOpen && !!form.branch_code && !editItem,
+    initialPageParam: 1,
+    getNextPageParam: () => undefined,
+  });
+  const rooms = (roomsRaw?.pages[0]?.items || []).filter(r => Number(r.del_flg) === 0);
 
-    try {
-      const res = await fetch(`${API_BASE}/admin/rooms/rooms-list?branch_code=${branchId}&page=1&page_size=100`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setRooms(Array.isArray(data?.items) ? data.items.filter((room) => Number(room.del_flg) === 0) : []);
-    } catch {
-      setRooms([]);
-    }
-  };
+  // Virtualization
+  const parentRef = useRef();
+  const rowVirtualizer = useVirtualizer({
+    count: bookings.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 61,
+    overscan: 10,
+  });
 
+  const virtualItems = rowVirtualizer.getVirtualItems();
+
+  // Infinite Scroll Trigger
   useEffect(() => {
-    if (!modalOpen || editItem) return;
-    loadRooms(form.branch_code);
-  }, [modalOpen, editItem, form.branch_code]);
-
-  const filtered = useMemo(() => bookings.filter((booking) => {
-    const keyword = search.trim().toLowerCase();
-    const matchSearch = !keyword || booking.bookingCode.toLowerCase().includes(keyword) || booking.guest.toLowerCase().includes(keyword) || booking.email.toLowerCase().includes(keyword);
-    const matchStatus = statusFilter === "all" || booking.status === statusFilter;
-    return matchSearch && matchStatus;
-  }), [bookings, search, statusFilter]);
+    const lastItem = virtualItems[virtualItems.length - 1];
+    if (lastItem && lastItem.index >= bookings.length - 1 && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [virtualItems, bookings.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const today = new Date().toISOString().split("T")[0];
   const statCards = [
     { label: t("admin.bookings.totalBookings"), value: totalBookings, icon: CalendarCheck, bg: "bg-blue-50", text: "text-blue-600" },
-    { label: t("admin.bookings.pendingBookings"), value: bookings.filter((booking) => booking.status === "pending").length, icon: Clock, bg: "bg-amber-50", text: "text-amber-600" },
-    { label: t("admin.bookings.todayCheckIn"), value: bookings.filter((booking) => booking.checkIn === today).length, icon: LogIn, bg: "bg-emerald-50", text: "text-emerald-600" },
-    { label: t("admin.bookings.todayCheckOut"), value: bookings.filter((booking) => booking.checkOut === today).length, icon: LogOutIcon, bg: "bg-violet-50", text: "text-violet-600" },
+    { label: t("admin.bookings.pendingBookings"), value: bookings.filter((b) => b.status === "pending").length, icon: Clock, bg: "bg-amber-50", text: "text-amber-600" },
+    { label: t("admin.bookings.todayCheckIn"), value: bookings.filter((b) => b.checkIn === today).length, icon: LogIn, bg: "bg-emerald-50", text: "text-emerald-600" },
+    { label: t("admin.bookings.todayCheckOut"), value: bookings.filter((b) => b.checkOut === today).length, icon: LogOutIcon, bg: "bg-violet-50", text: "text-violet-600" },
   ];
 
   const openAdd = () => {
     setEditItem(null);
     setForm(EMPTY_FORM);
-    setRooms([]);
     setError("");
     setModalOpen(true);
   };
@@ -259,7 +255,6 @@ const AdminBookings = () => {
     setModalOpen(false);
     setEditItem(null);
     setForm(EMPTY_FORM);
-    setRooms([]);
   };
 
   const handleFormChange = (field, value) => {
@@ -269,58 +264,48 @@ const AdminBookings = () => {
   const handleSave = async () => {
     setSubmitting(true);
     setError("");
-
     try {
-      if (editItem) {
-        const res = await fetch(`${API_BASE}/Admin/bookings/${editItem.bookingId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customer_name: form.customer_name.trim(),
-            customer_email: form.customer_email.trim(),
-            customer_phonenumber: form.customer_phonenumber.trim(),
-            note: form.note.trim() || null,
-            from_date: form.from_date,
-            to_date: form.to_date,
-            status: denormalizeStatus(form.status),
-            payment_status: form.payment_status,
-          }),
-        });
+      const url = editItem ? `${API_BASE}/Admin/bookings/${editItem.bookingId}` : `${API_BASE}/Admin/bookings/`;
+      const method = editItem ? "PATCH" : "POST";
+      const body = editItem ? {
+        customer_name: form.customer_name.trim(),
+        customer_email: form.customer_email.trim(),
+        customer_phonenumber: form.customer_phonenumber.trim(),
+        note: form.note.trim() || null,
+        from_date: form.from_date,
+        to_date: form.to_date,
+        status: denormalizeStatus(form.status),
+        payment_status: form.payment_status,
+      } : {
+        user_id: null,
+        branch_code: form.branch_code,
+        room_id: form.room_id,
+        customer_name: form.customer_name.trim(),
+        customer_email: form.customer_email.trim(),
+        customer_phonenumber: form.customer_phonenumber.trim(),
+        note: form.note.trim() || null,
+        from_date: form.from_date,
+        to_date: form.to_date,
+        status: denormalizeStatus(form.status),
+        payment_status: form.payment_status,
+        voucher_code: null,
+      };
 
-        if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          throw new Error(payload.detail || t("booking.bookingFailed"));
-        }
-      } else {
-        const res = await fetch(`${API_BASE}/Admin/bookings/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: null,
-            branch_code: form.branch_code,
-            room_id: form.room_id,
-            customer_name: form.customer_name.trim(),
-            customer_email: form.customer_email.trim(),
-            customer_phonenumber: form.customer_phonenumber.trim(),
-            note: form.note.trim() || null,
-            from_date: form.from_date,
-            to_date: form.to_date,
-            status: denormalizeStatus(form.status),
-            payment_status: form.payment_status,
-            voucher_code: null,
-          }),
-        });
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-        if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          throw new Error(payload.detail || t("booking.bookingFailed"));
-        }
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.detail || t("booking.bookingFailed"));
       }
 
-      await loadBookings();
+      await queryClient.invalidateQueries(["admin-bookings"]);
       closeModal();
     } catch (saveError) {
-      setError(saveError.message || t("booking.bookingFailed"));
+      setError(saveError.message);
     } finally {
       setSubmitting(false);
     }
@@ -328,19 +313,15 @@ const AdminBookings = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-
     setSubmitting(true);
     setError("");
     try {
       const res = await fetch(`${API_BASE}/Admin/bookings/${deleteTarget.bookingId}`, { method: "DELETE" });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        throw new Error(payload.detail || t("common.delete"));
-      }
-      await loadBookings();
+      if (!res.ok) throw new Error(t("common.delete"));
+      await queryClient.invalidateQueries(["admin-bookings"]);
       setDeleteTarget(null);
-    } catch (deleteError) {
-      setError(deleteError.message || t("common.delete"));
+    } catch (err) {
+      setError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -349,8 +330,31 @@ const AdminBookings = () => {
   const paymentOptions = editItem && ["paid", "refunded"].includes(editItem.paymentStatus) ? ["paid"] : PAYMENT_STATUS_OPTIONS;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="flex flex-col h-[calc(100vh-115px)] space-y-4 overflow-hidden p-0 max-h-[calc(100vh-115px)]">
+      <style>{`
+        .custom-active-scrollbar::-webkit-scrollbar {
+          width: 4px;
+          height: 4px;
+        }
+        .custom-active-scrollbar::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 10px;
+        }
+        .custom-active-scrollbar::-webkit-scrollbar-thumb {
+          background: #10b981;
+          border-radius: 10px;
+        }
+        .custom-active-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #059669;
+        }
+        /* Firefox */
+        .custom-active-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #10b981 #f1f5f9;
+        }
+      `}</style>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">{t("admin.bookings.title")}</h2>
           <p className="text-sm text-gray-500 mt-0.5">{t("admin.bookings.subtitle")}</p>
@@ -361,12 +365,13 @@ const AdminBookings = () => {
       </div>
 
       {error && !modalOpen && !deleteTarget && (
-        <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+        <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 shrink-0">
           <AlertCircle size={16} /> {error}
         </div>
       )}
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 shrink-0">
         {statCards.map((stat, index) => (
           <div key={index} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-4">
             <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", stat.bg)}>
@@ -380,8 +385,9 @@ const AdminBookings = () => {
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 px-6 py-4 border-b border-gray-100">
+      {/* Main Table Area */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="flex flex-col sm:flex-row items-center gap-3 px-6 py-4 border-b border-gray-100 shrink-0">
           <div className="relative flex-1 max-w-xs">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.bookings.searchPlaceholder")} className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300 transition" />
@@ -395,62 +401,90 @@ const AdminBookings = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                {[t("admin.bookings.bookingId"), t("admin.bookings.guestName"), t("admin.bookings.roomType"), t("admin.bookings.branch"), t("admin.bookings.checkIn"), t("admin.bookings.checkOut"), t("admin.bookings.totalAmount"), t("admin.bookings.paymentStatus"), t("admin.bookings.bookingStatus"), t("common.action")].map((header) => (
-                  <th key={header} className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr><td colSpan={10} className="py-10 text-center text-sm text-gray-400"><span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> {t("common.loading")}</span></td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={10} className="py-10 text-center text-sm text-gray-400">{t("common.noData")}</td></tr>
-              ) : filtered.map((booking, index) => {
+        <div className="overflow-auto relative flex-1 custom-active-scrollbar" ref={parentRef}>
+          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: "100%", position: "relative", minWidth: "1500px" }}>
+            <table className="w-full text-left border-collapse sticky top-0 bg-white z-20 shadow-sm table-fixed">
+              <thead>
+                <tr className="bg-gray-50/50 uppercase text-xs font-semibold text-gray-400 tracking-wider">
+                  <th className="px-4 py-3 w-[100px]">{t("common.action")}</th>
+                  <th className="px-4 py-3 w-[160px]">{t("admin.bookings.bookingId")}</th>
+                  <th className="px-4 py-3 w-[250px]">{t("admin.bookings.guestName")}</th>
+                  <th className="px-4 py-3 w-[200px]">{t("admin.bookings.roomType")}</th>
+                  <th className="px-4 py-3 w-[180px]">{t("admin.bookings.branch")}</th>
+                  <th className="px-4 py-3 w-[140px]">{t("admin.bookings.checkIn")}</th>
+                  <th className="px-4 py-3 w-[140px]">{t("admin.bookings.checkOut")}</th>
+                  <th className="px-4 py-3 w-[150px]">{t("admin.bookings.totalAmount")}</th>
+                  <th className="px-4 py-3 w-[150px]">{t("admin.bookings.paymentStatus")}</th>
+                  <th className="px-4 py-3 w-[160px]">{t("admin.bookings.bookingStatus")}</th>
+                </tr>
+              </thead>
+            </table>
+            
+            <div className="relative">
+              {virtualItems.map((virtualRow) => {
+                const booking = bookings[virtualRow.index];
                 const statusStyle = statusConfig[booking.status] || statusConfig.pending;
                 const paymentStyle = paymentConfig[booking.paymentStatus] || paymentConfig.unpaid;
-                const isLastElement = filtered.length === index + 1;
                 return (
-                  <tr ref={isLastElement ? lastBookingElementRef : null} key={booking.bookingId} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="px-4 py-3.5 text-sm font-mono font-bold text-gray-800">{booking.bookingCode}</td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{(booking.guest || "?").charAt(0)}</div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-800 whitespace-nowrap">{booking.guest}</div>
-                          <div className="text-xs text-gray-400">{booking.email}</div>
+                  <div
+                    key={booking.bookingId}
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: `${virtualRow.size}px`, transform: `translateY(${virtualRow.start}px)` }}
+                    className="flex items-center border-b border-gray-50 hover:bg-gray-50/60 transition-colors px-0 cursor-default"
+                  >
+                    <div className="w-full flex items-center">
+                      <div className="px-4 py-2 w-[100px] flex items-center gap-1.5 shrink-0">
+                        <button onClick={() => openEdit(booking)} title="Edit" className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"><Pencil size={13} /></button>
+                        <button onClick={() => setDeleteTarget(booking)} title="Delete" className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
+                      </div>
+                      <div className="px-4 py-2 w-[160px] text-sm font-mono font-bold text-gray-800 truncate shrink-0" title={booking.bookingCode}>{booking.bookingCode}</div>
+                      <div className="px-4 py-2 w-[250px] flex items-center gap-2 overflow-hidden shrink-0">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">{(booking.guest || "?").charAt(0)}</div>
+                        <div className="truncate">
+                          <div className="text-sm font-medium text-gray-800 truncate">{booking.guest}</div>
+                          <div className="text-xs text-gray-400 truncate">{booking.email}</div>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3.5 text-sm text-gray-600 whitespace-nowrap">{booking.room} · {booking.roomType}</td>
-                    <td className="px-4 py-3.5 text-sm text-gray-600 whitespace-nowrap">{booking.branch}</td>
-                    <td className="px-4 py-3.5 text-sm text-gray-600 whitespace-nowrap">{formatDate(booking.checkIn)}</td>
-                    <td className="px-4 py-3.5 text-sm text-gray-600 whitespace-nowrap">{formatDate(booking.checkOut)}</td>
-                    <td className="px-4 py-3.5 text-sm font-bold text-gray-800 whitespace-nowrap">{formatCurrency(booking.amount)}</td>
-                    <td className="px-4 py-3.5"><span className={cn("px-2.5 py-1 rounded-full text-xs font-semibold", paymentStyle.bg, paymentStyle.text)}>{t(`admin.bookings.paymentStatuses.${booking.paymentStatus}`)}</span></td>
-                    <td className="px-4 py-3.5"><span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold", statusStyle.bg, statusStyle.text)}><span className={cn("w-1.5 h-1.5 rounded-full", statusStyle.dot)} />{t(`admin.bookings.statuses.${booking.status}`)}</span></td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => openEdit(booking)} className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-colors"><Pencil size={13} /></button>
-                        <button onClick={() => setDeleteTarget(booking)} className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"><Trash2 size={13} /></button>
+                      <div className="px-4 py-2 w-[200px] text-sm text-gray-600 truncate shrink-0">{booking.room} · {booking.roomType}</div>
+                      <div className="px-4 py-2 w-[180px] text-sm text-gray-600 truncate shrink-0">{booking.branch}</div>
+                      <div className="px-4 py-2 w-[140px] text-sm text-gray-600 whitespace-nowrap shrink-0">{formatDate(booking.checkIn)}</div>
+                      <div className="px-4 py-2 w-[140px] text-sm text-gray-600 whitespace-nowrap shrink-0">{formatDate(booking.checkOut)}</div>
+                      <div className="px-4 py-2 w-[150px] text-sm font-bold text-gray-800 shrink-0">{formatCurrency(booking.amount)}</div>
+                      <div className="px-4 py-2 w-[150px] shrink-0">
+                        <span className={cn("px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider", paymentStyle.bg, paymentStyle.text)}>
+                          {t(`admin.bookings.paymentStatuses.${booking.paymentStatus}`)}
+                        </span>
                       </div>
-                    </td>
-                  </tr>
+                      <div className="px-4 py-2 w-[160px] shrink-0">
+                        <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider", statusStyle.bg, statusStyle.text)}>
+                          <span className={cn("w-1.5 h-1.5 rounded-full", statusStyle.dot)} />
+                          {t(`admin.bookings.statuses.${booking.status}`)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
-              {loadingMore && (
-                <tr>
-                  <td colSpan={10} className="py-4 text-center text-sm text-gray-400">Loading more...</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            </div>
+          </div>
+          {isFetchingNextPage && (
+            <div className="py-6 flex justify-center items-center gap-2 text-emerald-500 bg-white/80 sticky bottom-0 z-30 border-t border-gray-100">
+              <Loader2 size={20} className="animate-spin" />
+              <span className="text-sm font-medium text-gray-500 uppercase tracking-widest">{t("common.loading")}...</span>
+            </div>
+          )}
+          {bookingsLoading && bookings.length === 0 && (
+            <div className="py-20 text-center">
+              <Loader2 size={30} className="animate-spin text-emerald-500 mx-auto" />
+              <p className="mt-2 text-sm text-gray-400">{t("common.loading")}</p>
+            </div>
+          )}
+          {!bookingsLoading && bookings.length === 0 && (
+             <div className="py-20 text-center text-gray-400 italic text-sm">{t("common.noData")}</div>
+          )}
         </div>
       </div>
 
+      {/* Modals remain the same as before but slightly cleaner */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
@@ -488,7 +522,6 @@ const AdminBookings = () => {
                 <select value={form.payment_status} onChange={(e) => handleFormChange("payment_status", e.target.value)} className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-300">
                   {paymentOptions.map((status) => (<option key={status} value={status}>{t(`admin.bookings.paymentStatuses.${status}`)}</option>))}
                 </select>
-                {editItem && ["paid", "refunded"].includes(editItem.paymentStatus) && <p className="mt-1.5 text-xs text-gray-400">{t("admin.bookings.paymentLockedHint")}</p>}
               </div>
               {!editItem && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
