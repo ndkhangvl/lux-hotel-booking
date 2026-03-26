@@ -530,7 +530,10 @@
     "reviewPayment": "Thanh toán",
     "bankTransferSummary": "Bạn đã chọn chuyển khoản ngân hàng. Thông tin chuyển khoản sẽ được hiển thị sau khi tạo booking.",
     "payAtHotelSummary": "Bạn đã chọn thanh toán tại khách sạn khi check-in.",
-    "finalNotice": "Sau khi hoàn tất, hệ thống sẽ tạo booking và lưu thông tin thanh toán bạn đã chọn để lễ tân đối soát."
+    "finalNotice": "Sau khi hoàn tất, hệ thống sẽ tạo booking và lưu thông tin thanh toán bạn đã chọn để lễ tân đối soát.",
+    "checkingAvailability": "Kiểm tra phòng trống...",
+    "roomUnavailableForDates": "Phòng này không có sẵn cho những ngày đã chọn. Vui lòng chọn ngày khác.",
+    "roomUnavailable": "Phòng không có sẵn."
   },
   "footer": {
     "description": "AuroraHotel – Nơi hành trình nghỉ dưỡng tỏa sáng như cực quang.",
