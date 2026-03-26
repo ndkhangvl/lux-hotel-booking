@@ -530,7 +530,10 @@
     "reviewPayment": "Payment",
     "bankTransferSummary": "You selected bank transfer. Transfer instructions will be shown after the booking is created.",
     "payAtHotelSummary": "You selected to pay at the hotel during check-in.",
-    "finalNotice": "After completion, the system will create the booking and keep your selected payment information for front desk processing."
+    "finalNotice": "After completion, the system will create the booking and keep your selected payment information for front desk processing.",
+    "checkingAvailability": "Checking availability...",
+    "roomUnavailableForDates": "This room is not available for the selected dates. Please choose different dates.",
+    "roomUnavailable": "Room is not available."
   },
   "footer": {
     "description": "AuroraHotel – Where your relaxation journey shines like the aurora.",

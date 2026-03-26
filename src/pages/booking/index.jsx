@@ -103,14 +103,20 @@ const BookingPage = () => {
   const branchId = searchParams.get("branchId");
   const userId = useMemo(() => getUserIdFromToken(), []);
 
+  // Lấy ngày từ URL nếu có
+  const initialCheckIn = searchParams.get("checkIn") || today();
+  const initialCheckOut = searchParams.get("checkOut") || tomorrow();
+
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [roomLoading, setRoomLoading] = useState(true);
   const [roomError, setRoomError] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState("");
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   const [form, setForm] = useState({
-    checkIn: today(),
-    checkOut: tomorrow(),
+    checkIn: initialCheckIn,
+    checkOut: initialCheckOut,
     guests: 1,
     name: "",
     email: "",
@@ -226,6 +232,61 @@ const BookingPage = () => {
     fetchProfile();
   }, [userId]);
 
+  // Kiểm tra phòng trống khi chọn ngày
+  useEffect(() => {
+    const checkRoomAvailability = async () => {
+      if (!selectedRoom || !form.checkIn || !form.checkOut || nights <= 0) {
+        setAvailabilityError("");
+        return;
+      }
+
+      setCheckingAvailability(true);
+      setAvailabilityError("");
+
+      try {
+        const branchCode = selectedRoom.branch_code || branchId;
+        if (!branchCode) {
+          setCheckingAvailability(false);
+          return;
+        }
+
+        const params = new URLSearchParams({
+          branch_code: branchCode,
+          from_date: form.checkIn,
+          to_date: form.checkOut,
+        });
+
+        const res = await fetch(`${API_BASE}/user/rooms/available-rooms?${params}`);
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || t("booking.roomUnavailable"));
+        }
+
+        const availableRooms = await res.json();
+
+        // Kiểm tra xem phòng hiện tại có trong danh sách phòng trống không
+        const roomIdStr = String(selectedRoom.room_id);
+        const branchRoomIdStr = String(selectedRoom.branch_room_id || "");
+        const isCurrentRoomAvailable = availableRooms.some(
+          (room) =>
+            String(room.room_id) === roomIdStr ||
+            (branchRoomIdStr && String(room.branch_room_id) === branchRoomIdStr),
+        );
+
+        if (!isCurrentRoomAvailable) {
+          setAvailabilityError(t("booking.roomUnavailableForDates") || "Phòng này không có sẵn cho những ngày đã chọn. Vui lòng chọn ngày khác.");
+        }
+      } catch (error) {
+        setAvailabilityError(error.message || t("booking.roomUnavailable"));
+      } finally {
+        setCheckingAvailability(false);
+      }
+    };
+
+    checkRoomAvailability();
+  }, [form.checkIn, form.checkOut, selectedRoom, branchId, t]);
+
   const nights = calcNights(form.checkIn, form.checkOut);
   const total = selectedRoom ? Number(selectedRoom.price || 0) * nights : 0;
   const isLoggedIn = Boolean(userId && getAccessToken());
@@ -330,11 +391,67 @@ const BookingPage = () => {
     setCurrentStep(3);
   };
 
+  const verifyRoomAvailabilityBeforeSubmit = async () => {
+    /**
+     * Kiểm tra lần nữa phòng còn trống không trước khi submit
+     * Để tránh race condition khi 2 khách đặt cùng phòng
+     */
+    if (!selectedRoom || !form.checkIn || !form.checkOut) {
+      return true;
+    }
+
+    try {
+      const branchCode = selectedRoom.branch_code || branchId;
+      if (!branchCode) return true;
+
+      const params = new URLSearchParams({
+        branch_code: branchCode,
+        from_date: form.checkIn,
+        to_date: form.checkOut,
+      });
+
+      const res = await fetch(`${API_BASE}/user/rooms/available-rooms?${params}`);
+
+      if (!res.ok) {
+        throw new Error("Failed to verify availability");
+      }
+
+      const availableRooms = await res.json();
+      const roomIdStr = String(selectedRoom.room_id);
+      const branchRoomIdStr = String(selectedRoom.branch_room_id || "");
+      const isStillAvailable = availableRooms.some(
+        (room) =>
+          String(room.room_id) === roomIdStr ||
+          (branchRoomIdStr && String(room.branch_room_id) === branchRoomIdStr),
+      );
+
+      if (!isStillAvailable) {
+        setSubmitError(
+          "Phòng này vừa được khách khác đặt. Vui lòng chọn phòng khác hoặc chọn ngày khác."
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      setSubmitError("Không thể xác nhận tính khả dụng của phòng. Vui lòng thử lại.");
+      return false;
+    }
+  };
+
   const handleSubmit = async () => {
     if (!validateBookingStep() || !validatePaymentStep()) return;
 
     setSubmitting(true);
     setSubmitError("");
+
+    // Kiểm tra lần nữa phòng trống trước khi submit
+    const isAvailable = await verifyRoomAvailabilityBeforeSubmit();
+    if (!isAvailable) {
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const localPhoneNumber = normalizePhoneNumber(form.phone);
       const customerPhoneNumber = `${dialDigits}${localPhoneNumber}`;
@@ -515,8 +632,18 @@ const BookingPage = () => {
                     </div>
                     {nights <= 0 && (
                       <p className="mt-3 text-sm text-red-500">{t("booking.invalidDateRange")}</p>
+                    )}                    {availabilityError && (
+                      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                        <AlertCircle className="w-4 h-4 mt-0.5 text-red-600 shrink-0" />
+                        <p className="text-sm text-red-600">{availabilityError}</p>
+                      </div>
                     )}
-                    {guestLimitExceeded && (
+                    {checkingAvailability && (
+                      <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {t("booking.checkingAvailability") || "Kiểm tra phòng trống..."}
+                      </div>
+                    )}                    {guestLimitExceeded && (
                       <p className="mt-3 text-sm text-red-500">{t("booking.exceedCapacity")}</p>
                     )}
                   </div>
@@ -616,7 +743,7 @@ const BookingPage = () => {
                       <button
                         type="button"
                         onClick={goToPaymentStep}
-                        disabled={nights <= 0 || guestLimitExceeded || !selectedRoom.room_id}
+                        disabled={nights <= 0 || guestLimitExceeded || !selectedRoom.room_id || !!availabilityError || checkingAvailability}
                         className="w-full flex items-center justify-center gap-2 bg-(--main) hover:bg-[#52DBA9] disabled:opacity-60 text-white py-3.5 rounded-full font-semibold transition-all shadow-lg shadow-(--main)/20 active:scale-95"
                       >
                         {t("booking.continueToPayment")}
